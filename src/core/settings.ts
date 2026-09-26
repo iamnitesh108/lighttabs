@@ -20,6 +20,11 @@ export type Settings = {
    * icon's tooltip anyway.
    */
   showBadge: boolean
+  /**
+   * Remember where YouTube videos were when suspending or saving them.
+   * Needs access to youtube.com, which the settings page asks for.
+   */
+  rememberVideoTime: boolean
 
   keepPinnedWhenSaving: boolean
   /**
@@ -48,6 +53,7 @@ export const defaultSettings: Settings = {
   neverSuspendSites: [],
   clickToLoad: true,
   showBadge: false,
+  rememberVideoTime: false,
   keepPinnedWhenSaving: true,
   saveSuspendedAfterDays: 0,
   openSavedPageAfterSaving: true,
@@ -105,6 +111,7 @@ const booleanKeys: BooleanKey[] = [
   'keepWhenOffline',
   'clickToLoad',
   'showBadge',
+  'rememberVideoTime',
   'keepPinnedWhenSaving',
   'openSavedPageAfterSaving',
   'keepListsAfterRestoring',

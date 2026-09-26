@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Pages } from '../../src/background/pages.ts'
 import { TabSaver } from '../../src/background/tab-saver.ts'
+import { VideoTimes } from '../../src/background/video-times.ts'
 import type { Settings } from '../../src/core/settings.ts'
 import {
   Clock,
@@ -25,6 +26,7 @@ function setup(settings: Partial<Settings> = {}) {
     pages: new Pages(browser, origin),
     now: clock.now,
     makeId: () => `id${++n}`,
+    videos: new VideoTimes(browser, store),
   })
   return { clock, browser, sessions, saver }
 }
@@ -220,5 +222,19 @@ describe('tab groups', () => {
     expect(list.name).toBe('Trip')
     expect(browser.tabs.map((t) => t.url)).toContain('https://b.com/')
     expect(browser.tabs.map((t) => t.url)).not.toContain('https://a.com/')
+  })
+})
+
+describe('YouTube position', () => {
+  it('saves a video with its position', async () => {
+    const { browser, sessions, saver } = setup({ rememberVideoTime: true })
+    browser.addTab({ active: true })
+    const tab = browser.addTab({ url: 'https://www.youtube.com/watch?v=abc' })
+    browser.videoTimes.set(tab.id, 61)
+    await saver.saveWindow(1)
+    const [list] = await sessions.list()
+    expect(list.tabs.map((t) => t.url)).toContain(
+      'https://www.youtube.com/watch?v=abc&t=61s',
+    )
   })
 })

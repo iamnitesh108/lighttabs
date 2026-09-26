@@ -9,6 +9,7 @@ import type { Browser } from '../platform/browser.ts'
 import { UserError } from '../shared/messages.ts'
 import type { Pages } from './pages.ts'
 import type { SessionRepository, SettingsSource } from './ports.ts'
+import type { VideoTimes } from './video-times.ts'
 
 type Dependencies = {
   browser: Browser
@@ -17,6 +18,7 @@ type Dependencies = {
   pages: Pages
   now: () => number
   makeId: () => string
+  videos: VideoTimes
 }
 
 /**
@@ -226,10 +228,13 @@ export class TabSaver {
     const ids = [...new Set(tabs.map((t) => t.groupId))].filter((id) => id >= 0)
     const found = new Map<number, GroupInfo | null>()
     for (const id of ids) found.set(id, await this.deps.browser.getGroup(id))
-    return tabs.map((tab) => {
+    const urls = await Promise.all(
+      tabs.map((tab) => this.deps.videos.addressWithTime(tab)),
+    )
+    return tabs.map((tab, i) => {
       const group = found.get(tab.groupId)
       return {
-        url: tab.url,
+        url: urls[i],
         title: tab.title,
         ...(group && { group: { ...group, key: tab.groupId } }),
       }

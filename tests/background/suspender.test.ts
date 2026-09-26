@@ -3,6 +3,7 @@ import { ActivityTracker } from '../../src/background/activity-tracker.ts'
 import { Pages } from '../../src/background/pages.ts'
 import type { TabJob } from '../../src/background/suspender.ts'
 import { Suspender } from '../../src/background/suspender.ts'
+import { VideoTimes } from '../../src/background/video-times.ts'
 import type { Settings } from '../../src/core/settings.ts'
 import {
   Clock,
@@ -37,6 +38,7 @@ function setup(settings: Partial<Settings> = {}, online = true) {
     now: clock.now,
     isOnline: () => online,
     cpuCores: 4,
+    videos: new VideoTimes(browser, store),
   })
   return { clock, browser, activity, store, suspender }
 }
@@ -323,5 +325,33 @@ describe('tab groups', () => {
     expect(browser.byUrl(inGroup.url).discarded).toBe(true)
     expect(browser.byUrl(outside.url).discarded).toBe(false)
     expect(browser.byUrl(current.url).discarded).toBe(false)
+  })
+})
+
+describe('YouTube position', () => {
+  const video = 'https://www.youtube.com/watch?v=abc'
+
+  it('suspends a video with its position, and opens it there', async () => {
+    const { browser, suspender } = setup({
+      clickToLoad: true,
+      rememberVideoTime: true,
+    })
+    browser.addTab({ active: true })
+    const tab = browser.addTab({ url: video })
+    browser.videoTimes.set(tab.id, 754.2)
+    await finished(suspender.suspendOthers(1))
+    const suspended = browser.byUrl(`${video}&t=754s`)
+    expect(suspended.placeholder).toBe(true)
+    await suspender.unsuspendTab(suspended.id)
+    expect(browser.byUrl(`${video}&t=754s`).placeholder).toBe(false)
+  })
+
+  it('leaves the address alone when switched off', async () => {
+    const { browser, suspender } = setup({ clickToLoad: true })
+    browser.addTab({ active: true })
+    const tab = browser.addTab({ url: video })
+    browser.videoTimes.set(tab.id, 754)
+    await finished(suspender.suspendOthers(1))
+    expect(browser.byUrl(video).placeholder).toBe(true)
   })
 })

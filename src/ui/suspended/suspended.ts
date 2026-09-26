@@ -1,4 +1,5 @@
 import { parsePlaceholder } from '../../core/placeholder.ts'
+import { hasVideoTime } from '../../core/video-time.ts'
 import { byId } from '../shared/dom.ts'
 import { faviconUrl } from '../shared/favicon.ts'
 
@@ -36,7 +37,8 @@ const backTimeoutMs = 1000
  * address; so does any tab where going back doesn't start.
  */
 function load(url: string): void {
-  if (history.length < 2) {
+  // A video's address holds where it was; the earlier page doesn't.
+  if (history.length < 2 || hasVideoTime(url)) {
     location.replace(url)
     return
   }

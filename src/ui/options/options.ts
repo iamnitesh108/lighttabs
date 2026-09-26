@@ -5,6 +5,7 @@ import {
   suspendAfterChoices,
 } from '../../core/settings.ts'
 import { normalizeSiteRule } from '../../core/sites.ts'
+import { youTubeOrigins } from '../../core/video-time.ts'
 import { SettingsStore } from '../../platform/settings-store.ts'
 import { send } from '../../shared/messages.ts'
 import { byId, el } from '../shared/dom.ts'
@@ -17,6 +18,7 @@ const note = byId('saved-note')
 const minutes = byId<HTMLSelectElement>('suspendAfterMinutes')
 const days = byId<HTMLSelectElement>('saveSuspendedAfterDays')
 const sites = byId<HTMLTextAreaElement>('neverSuspendSites')
+const videoTime = byId<HTMLInputElement>('rememberVideoTime')
 
 function show(settings: Settings): void {
   minutes.value = String(settings.suspendAfterMinutes)
@@ -26,6 +28,7 @@ function show(settings: Settings): void {
   )) {
     box.checked = settings[box.dataset.setting as BooleanSetting]
   }
+  videoTime.checked = settings.rememberVideoTime
   // Don't overwrite what the user is typing.
   if (document.activeElement !== sites)
     sites.value = settings.neverSuspendSites.join('\n')
@@ -78,6 +81,15 @@ async function main(): Promise<void> {
       () => void save({ [box.dataset.setting as BooleanSetting]: box.checked }),
     )
   }
+
+  // Reading a video's position needs access to YouTube, asked for only
+  // when this is turned on (and given back when it's turned off).
+  videoTime.addEventListener('change', async () => {
+    const origins = { origins: youTubeOrigins }
+    const on = videoTime.checked && (await chrome.permissions.request(origins))
+    if (!on) await chrome.permissions.remove(origins)
+    await save({ rememberVideoTime: on })
+  })
 
   // Sites are saved when the field loses focus; lines that aren't sites are
   // dropped, and the cleaned list is shown back.

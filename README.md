@@ -16,6 +16,7 @@ Works in Brave, Chrome, Edge and other Chromium browsers (version 121 or newer).
 - Leaves alone pinned tabs, tabs playing audio, and sites you choose. Doesn't suspend anything while you're offline, since the page couldn't load again.
 - Keep one tab loaded for now, without adding its site to a list.
 - A suspended tab loads only when you click its page, and comes back where you left it (scroll position included).
+- Optionally, YouTube videos resume where they were, after suspending or saving them.
 - Unsuspend all tabs of a window at once: the ones next to your current tab load first, a few at a time, so the browser stays responsive.
 - Point at the toolbar icon to see how many tabs are suspended (or show the number on the icon).
 
@@ -75,16 +76,17 @@ Change them at `brave://extensions/shortcuts` (or the settings page's **Change s
 
 ## Permissions
 
-| Permission                    | Why                                                                                            |
-| ----------------------------- | ---------------------------------------------------------------------------------------------- |
-| `tabs`                        | To see each tab's address and title, and to suspend, open and close tabs.                      |
-| `storage`, `unlimitedStorage` | To keep your settings and saved lists. Large lists shouldn't hit a size limit.                 |
-| `alarms`                      | To check once a minute which tabs have been idle long enough (and once a day for unused ones). |
-| `favicon`                     | To show site icons in the saved lists without loading the sites.                               |
-| `contextMenus`                | For the right-click menu.                                                                      |
-| `tabGroups`                   | To save tab groups with their name and colour, and restore them.                               |
+| Permission                      | Why                                                                                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `tabs`                          | To see each tab's address and title, and to suspend, open and close tabs.                                                             |
+| `storage`, `unlimitedStorage`   | To keep your settings and saved lists. Large lists shouldn't hit a size limit.                                                        |
+| `alarms`                        | To check once a minute which tabs have been idle long enough (and once a day for unused ones).                                        |
+| `favicon`                       | To show site icons in the saved lists without loading the sites.                                                                      |
+| `contextMenus`                  | For the right-click menu.                                                                                                             |
+| `tabGroups`                     | To save tab groups with their name and colour, and restore them.                                                                      |
+| `scripting`, YouTube (optional) | Only if you turn on "Remember where YouTube videos were": to read the video's position on youtube.com. Asked for when you turn it on. |
 
-It asks for no access to websites and has no content scripts.
+It asks for no access to websites (except YouTube, if you turn that option on) and has no content scripts.
 
 ## Privacy
 

@@ -31,7 +31,12 @@
     "alarms",
     "favicon",
     "contextMenus",
-    "tabGroups"
+    "tabGroups",
+    "scripting"
+  ],
+  "optional_host_permissions": [
+    "https://www.youtube.com/*",
+    "https://m.youtube.com/*"
   ],
   "commands": {
     "_execute_action": {

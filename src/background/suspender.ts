@@ -1,5 +1,6 @@
 import { runLimited } from '../core/limit.ts'
 import { loadLimit, nearestFirst } from '../core/load-order.ts'
+import { hasVideoTime } from '../core/video-time.ts'
 import { excludingRule, siteOf } from '../core/sites.ts'
 import { suspendBlocker, timeUntilDue } from '../core/suspend-policy.ts'
 import type { TabInfo } from '../core/tab.ts'
@@ -10,6 +11,7 @@ import { UserError } from '../shared/messages.ts'
 import type { ActivityTracker } from './activity-tracker.ts'
 import type { Pages } from './pages.ts'
 import type { SettingsSource } from './ports.ts'
+import type { VideoTimes } from './video-times.ts'
 
 /**
  * A job over many tabs: how many tabs it covers (known right away, for the
@@ -25,6 +27,7 @@ type Dependencies = {
   now: () => number
   isOnline: () => boolean
   cpuCores: number
+  videos: VideoTimes
 }
 
 /**
@@ -295,10 +298,11 @@ export class Suspender {
    * tab in front keeps showing the page.
    */
   private async suspend(tab: TabInfo, clickToLoad: boolean): Promise<boolean> {
-    const { browser, pages, now } = this.deps
+    const { browser, pages, now, videos } = this.deps
     if (!clickToLoad) return browser.discard(tab.id)
+    const url = await videos.addressWithTime(tab)
     const iconShown = browser.waitForIcon(tab.id, iconWaitMs)
-    const page = { url: tab.url, title: tab.title, since: now() }
+    const page = { url, title: tab.title, since: now() }
     if (!(await browser.navigate(tab.id, pages.placeholderFor(page))))
       return false
     if (!tab.active && (await iconShown)) await browser.discard(tab.id)
@@ -316,7 +320,8 @@ export class Suspender {
   private async unsuspend(tab: TabInfo): Promise<void> {
     const { browser } = this.deps
     if (tab.placeholder) {
-      if (!tab.discarded && (await browser.goBack(tab.id))) return
+      const back = !tab.discarded && !hasVideoTime(tab.url)
+      if (back && (await browser.goBack(tab.id))) return
       await browser.navigate(tab.id, tab.url)
     } else if (tab.discarded) {
       await browser.reload(tab.id)

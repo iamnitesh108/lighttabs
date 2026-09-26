@@ -38,6 +38,8 @@ export interface Browser {
   }): Promise<TabInfo>
   removeTabs(ids: number[]): Promise<void>
   getGroup(id: number): Promise<GroupInfo | null>
+  /** Seconds into the page's video, or null (no video, or no access to the site). */
+  videoTime(tabId: number): Promise<number | null>
   /** Puts tabs of one window into a new group. */
   groupTabs(tabIds: number[], windowId: number, group: GroupInfo): Promise<void>
   createWindow(url: string): Promise<{ windowId: number; tabId: number }>
@@ -182,6 +184,18 @@ export class ChromeBrowser implements Browser {
 
   async removeTabs(ids: number[]): Promise<void> {
     if (ids.length > 0) await chrome.tabs.remove(ids)
+  }
+
+  async videoTime(tabId: number): Promise<number | null> {
+    try {
+      const [result] = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => document.querySelector('video')?.currentTime ?? null,
+      })
+      return typeof result?.result === 'number' ? result.result : null
+    } catch {
+      return null // no access to this site, or the tab isn't loaded
+    }
   }
 
   async getGroup(id: number): Promise<GroupInfo | null> {

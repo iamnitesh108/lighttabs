@@ -82,6 +82,13 @@ export class FakeBrowser implements Browser {
       .map((t) => ({ ...t }))
   }
 
+  /** Video positions by tab id, as the page would report them. */
+  videoTimes = new Map<number, number>()
+
+  async videoTime(tabId: number): Promise<number | null> {
+    return this.videoTimes.get(tabId) ?? null
+  }
+
   async getGroup(id: number): Promise<GroupInfo | null> {
     return this.groups.get(id) ?? null
   }

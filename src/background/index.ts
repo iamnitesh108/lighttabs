@@ -23,6 +23,7 @@ import { Suspender } from './suspender.ts'
 import type { Target } from './tab-actions.ts'
 import { tabActions } from './tab-actions.ts'
 import { TabSaver } from './tab-saver.ts'
+import { VideoTimes } from './video-times.ts'
 
 const timerAlarm = 'suspend-timer'
 const autoSaveAlarm = 'auto-save'
@@ -33,6 +34,7 @@ const settings = new SettingsStore()
 const sessions = new SessionStore()
 const activity = new ActivityTracker(new ActivityStore(), now)
 const pages = new Pages(browser, chrome.runtime.getURL(''))
+const videos = new VideoTimes(browser, settings)
 const suspender = new Suspender({
   browser,
   activity,
@@ -41,6 +43,7 @@ const suspender = new Suspender({
   now,
   isOnline: () => navigator.onLine,
   cpuCores: navigator.hardwareConcurrency,
+  videos,
 })
 const badge = new Badge(browser, settings, new ChromeBadge())
 const saver = new TabSaver({
@@ -50,6 +53,7 @@ const saver = new TabSaver({
   pages,
   now,
   makeId: () => crypto.randomUUID(),
+  videos,
 })
 
 const actions = tabActions(suspender, saver, pages)
