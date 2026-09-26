@@ -255,10 +255,11 @@ export class Suspender {
    * tab in front keeps showing the page.
    */
   private async suspend(tab: TabInfo, clickToLoad: boolean): Promise<boolean> {
-    const { browser, pages } = this.deps
+    const { browser, pages, now } = this.deps
     if (!clickToLoad) return browser.discard(tab.id)
     const iconShown = browser.waitForIcon(tab.id)
-    if (!(await browser.navigate(tab.id, pages.placeholderFor(tab))))
+    const page = { url: tab.url, title: tab.title, since: now() }
+    if (!(await browser.navigate(tab.id, pages.placeholderFor(page))))
       return false
     if (!tab.active && (await iconShown)) await browser.discard(tab.id)
     return true

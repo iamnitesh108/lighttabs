@@ -23,7 +23,7 @@ export class FakeBrowser implements Browser {
   /** The page each tab was on before its current one, for goBack. */
   private previous = new Map<
     number,
-    Pick<TabInfo, 'url' | 'title' | 'placeholder'>
+    Pick<TabInfo, 'url' | 'title' | 'placeholder' | 'suspendedAt'>
   >()
   private nextId = 100
   focused: number | null = null
@@ -48,6 +48,7 @@ export class FakeBrowser implements Browser {
       audible: false,
       discarded: false,
       placeholder: false,
+      suspendedAt: null,
       autoDiscardable: true,
       ...overrides,
     }
@@ -88,6 +89,7 @@ export class FakeBrowser implements Browser {
       url: tab.url,
       title: tab.title,
       placeholder: tab.placeholder,
+      suspendedAt: tab.suspendedAt,
     })
     // Like ChromeBrowser, a tab showing the suspended-tab page reports the
     // page it stands for.
@@ -95,6 +97,7 @@ export class FakeBrowser implements Browser {
     tab.url = page?.url ?? url
     tab.title = page?.title ?? ''
     tab.placeholder = page !== null
+    tab.suspendedAt = page?.since ?? null
     tab.discarded = false
     return true
   }
@@ -145,6 +148,7 @@ export class FakeBrowser implements Browser {
       url: page?.url ?? options.url,
       title: page?.title ?? '',
       placeholder: page !== null,
+      suspendedAt: page?.since ?? null,
       windowId: options.windowId ?? 1,
     })
     if (options.active) await this.activate(tab.id)

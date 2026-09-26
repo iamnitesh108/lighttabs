@@ -26,7 +26,7 @@ function setup(settings: Partial<Settings> = {}) {
     now: clock.now,
     makeId: () => `id${++n}`,
   })
-  return { browser, sessions, saver }
+  return { clock, browser, sessions, saver }
 }
 
 describe('saving', () => {
@@ -153,5 +153,31 @@ describe('import', () => {
   it('turns parse problems into messages for the user', async () => {
     const { saver } = setup()
     await expect(saver.import('')).rejects.toThrow('The file is empty.')
+  })
+})
+
+describe('saving unused suspended tabs', () => {
+  it('saves them into one list and closes them', async () => {
+    const { clock, browser, sessions, saver } = setup({
+      saveSuspendedAfterDays: 7,
+    })
+    const day = 24 * 60
+    browser.addTab({ active: true })
+    browser.addTab({
+      url: 'https://old.com/',
+      placeholder: true,
+      suspendedAt: clock.now(),
+    })
+    clock.advanceMinutes(8 * day)
+    browser.addTab({
+      url: 'https://new.com/',
+      placeholder: true,
+      suspendedAt: clock.now(),
+    })
+    expect(await saver.saveUnusedTabs()).toBe(1)
+    const [list] = await sessions.list()
+    expect(list.name).toBe('Not opened for 7 days')
+    expect(list.tabs.map((t) => t.url)).toEqual(['https://old.com/'])
+    expect(browser.tabs.map((t) => t.url)).not.toContain('https://old.com/')
   })
 })

@@ -1,6 +1,9 @@
 import { formatMinutes } from '../../core/format.ts'
 import type { Settings } from '../../core/settings.ts'
-import { suspendAfterChoices } from '../../core/settings.ts'
+import {
+  saveSuspendedAfterChoices,
+  suspendAfterChoices,
+} from '../../core/settings.ts'
 import { normalizeSiteRule } from '../../core/sites.ts'
 import { SettingsStore } from '../../platform/settings-store.ts'
 import { send } from '../../shared/messages.ts'
@@ -12,10 +15,12 @@ type BooleanSetting = {
 
 const note = byId('saved-note')
 const minutes = byId<HTMLSelectElement>('suspendAfterMinutes')
+const days = byId<HTMLSelectElement>('saveSuspendedAfterDays')
 const sites = byId<HTMLTextAreaElement>('neverSuspendSites')
 
 function show(settings: Settings): void {
   minutes.value = String(settings.suspendAfterMinutes)
+  days.value = String(settings.saveSuspendedAfterDays)
   for (const box of document.querySelectorAll<HTMLInputElement>(
     '[data-setting]',
   )) {
@@ -49,6 +54,20 @@ async function main(): Promise<void> {
   minutes.addEventListener(
     'change',
     () => void save({ suspendAfterMinutes: Number(minutes.value) }),
+  )
+
+  for (const choice of saveSuspendedAfterChoices) {
+    days.append(
+      el(
+        'option',
+        { value: choice },
+        choice === 0 ? 'Never' : formatMinutes(choice * 24 * 60),
+      ),
+    )
+  }
+  days.addEventListener(
+    'change',
+    () => void save({ saveSuspendedAfterDays: Number(days.value) }),
   )
 
   for (const box of document.querySelectorAll<HTMLInputElement>(

@@ -25,6 +25,7 @@ import { tabActions } from './tab-actions.ts'
 import { TabSaver } from './tab-saver.ts'
 
 const timerAlarm = 'suspend-timer'
+const autoSaveAlarm = 'auto-save'
 const now = () => Date.now()
 
 const browser = new ChromeBrowser(chrome.runtime.getURL(placeholderPath))
@@ -147,6 +148,7 @@ chrome.runtime.onStartup.addListener(async () => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === timerAlarm) void suspender.runTimer()
+  if (alarm.name === autoSaveAlarm) void saver.saveUnusedTabs()
 })
 
 // The badge only changes when tabs are suspended, loaded, opened or closed.
@@ -195,10 +197,18 @@ chrome.runtime.onUpdateAvailable.addListener(async () => {
   if (await suspender.prepareForUpdate()) chrome.runtime.reload()
 })
 
-/** The timer checks once a minute (the shortest period alarms allow). */
+/**
+ * The suspend timer checks once a minute (the shortest period alarms
+ * allow). Saving unused tabs counts in days, so once a day is enough, and
+ * puts that day's tabs in one list. The browser keeps alarms across
+ * restarts and runs a missed one soon after starting.
+ */
 async function ensureTimer(): Promise<void> {
   if (!(await chrome.alarms.get(timerAlarm))) {
     await chrome.alarms.create(timerAlarm, { periodInMinutes: 1 })
+  }
+  if (!(await chrome.alarms.get(autoSaveAlarm))) {
+    await chrome.alarms.create(autoSaveAlarm, { periodInMinutes: 24 * 60 })
   }
 }
 

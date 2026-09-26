@@ -22,6 +22,11 @@ export type Settings = {
   showBadge: boolean
 
   keepPinnedWhenSaving: boolean
+  /**
+   * Save and close suspended tabs not opened for this many days, so they
+   * use no memory at all. 0 = never.
+   */
+  saveSuspendedAfterDays: number
   openSavedPageAfterSaving: boolean
   keepListsAfterRestoring: boolean
   /** Restored tabs appear in the tab strip but only load when opened. */
@@ -33,6 +38,8 @@ export const suspendAfterChoices = [
   0, 5, 15, 30, 60, 120, 360, 720, 1440,
 ] as const
 
+export const saveSuspendedAfterChoices = [0, 1, 3, 7, 14, 30] as const
+
 export const defaultSettings: Settings = {
   suspendAfterMinutes: 30,
   keepPinned: true,
@@ -42,6 +49,7 @@ export const defaultSettings: Settings = {
   clickToLoad: true,
   showBadge: false,
   keepPinnedWhenSaving: true,
+  saveSuspendedAfterDays: 0,
   openSavedPageAfterSaving: true,
   keepListsAfterRestoring: false,
   restoreWithoutLoading: true,
@@ -63,6 +71,14 @@ export function normalizeSettings(raw: unknown): Settings {
     (suspendAfterChoices as readonly number[]).includes(minutes)
   ) {
     result.suspendAfterMinutes = minutes
+  }
+
+  const days = input.saveSuspendedAfterDays
+  if (
+    typeof days === 'number' &&
+    (saveSuspendedAfterChoices as readonly number[]).includes(days)
+  ) {
+    result.saveSuspendedAfterDays = days
   }
 
   for (const key of booleanKeys) {

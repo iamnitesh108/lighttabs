@@ -1,3 +1,5 @@
+import { unusedSuspendedTabs } from '../core/auto-save.ts'
+import { plural } from '../core/format.ts'
 import type { SavedSession, TabToSave } from '../core/sessions.ts'
 import { newSession, withoutTab } from '../core/sessions.ts'
 import type { TabInfo } from '../core/tab.ts'
@@ -89,6 +91,32 @@ export class TabSaver {
   }
 
   /**
+   * Saves suspended tabs that haven't been opened for a while into one list
+   * and closes them. Runs once a day; returns how many were saved.
+   */
+  async saveUnusedTabs(): Promise<number> {
+    const { browser, sessions, now, makeId } = this.deps
+    const settings = await this.deps.settings.get()
+    const unused = unusedSuspendedTabs(
+      await browser.queryTabs(),
+      now(),
+      settings,
+    )
+    if (unused.length === 0) return 0
+
+    const days = settings.saveSuspendedAfterDays
+    const session = newSession(unused.map(toTabToSave), {
+      now: now(),
+      makeId,
+      skipDuplicates: settings.skipDuplicatesWhenSaving,
+      name: `Not opened for ${plural(days, 'day')}`,
+    })
+    await sessions.add([session])
+    await browser.removeTabs(unused.map((t) => t.id))
+    return unused.length
+  }
+
+  /**
    * Opens a list's tabs again. With "restore without loading" they appear
    * in the tab strip but use no memory until opened, so restoring 100 tabs
    * doesn't freeze the browser: they open as suspended-tab pages (with
@@ -99,7 +127,7 @@ export class TabSaver {
     windowId: number,
     newWindow: boolean,
   ): Promise<void> {
-    const { browser, sessions, pages } = this.deps
+    const { browser, sessions, pages, now } = this.deps
     const settings = await this.deps.settings.get()
     const session = await sessions.get(sessionId)
     if (!session) throw new UserError('This list no longer exists.')
@@ -116,7 +144,9 @@ export class TabSaver {
     const created: number[] = []
     for (const tab of rest) {
       const opened = await browser.createTab({
-        url: asPlaceholders ? pages.placeholderFor(tab) : tab.url,
+        url: asPlaceholders
+          ? pages.placeholderFor({ ...tab, since: now() })
+          : tab.url,
         windowId: target,
         active: false,
       })

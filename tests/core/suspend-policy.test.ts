@@ -18,6 +18,7 @@ const tab = (overrides: Partial<TabInfo> = {}): TabInfo => ({
   audible: false,
   discarded: false,
   placeholder: false,
+  suspendedAt: null,
   autoDiscardable: true,
   ...overrides,
 })

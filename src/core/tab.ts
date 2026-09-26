@@ -16,6 +16,8 @@ export type TabInfo = {
   discarded: boolean
   /** Shows the suspended-tab page, which loads the site only when clicked. */
   placeholder: boolean
+  /** When the suspended-tab page was shown, if the tab has one that says. */
+  suspendedAt: number | null
   /** False when the user or another extension has marked the tab "keep loaded". */
   autoDiscardable: boolean
 }

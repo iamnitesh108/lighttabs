@@ -14,6 +14,16 @@ describe('placeholder addresses', () => {
     expect(parsePlaceholder(url, base)).toEqual(page)
   })
 
+  it('remembers when the tab was suspended, when it knows', () => {
+    const page = { url: 'https://a.com/', title: 'A', since: 1_790_000_000_000 }
+    expect(parsePlaceholder(placeholderUrl(base, page), base)).toEqual(page)
+    const old = `${base}#url=https%3A%2F%2Fa.com%2F&title=A`
+    expect(parsePlaceholder(old, base)).toEqual({
+      url: 'https://a.com/',
+      title: 'A',
+    })
+  })
+
   it('ignores other addresses', () => {
     expect(parsePlaceholder('https://example.com/', base)).toBeNull()
     expect(

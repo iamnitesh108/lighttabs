@@ -208,6 +208,7 @@ export class ChromeBrowser implements Browser {
       audible: tab.audible ?? false,
       discarded: tab.discarded,
       placeholder: page !== null,
+      suspendedAt: page?.since ?? null,
       autoDiscardable: tab.autoDiscardable,
     }
   }
