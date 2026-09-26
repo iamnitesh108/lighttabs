@@ -27,11 +27,11 @@ async function main(): Promise<void> {
     'suspend-tab': () => send('suspend-tab', { tabId }).then(close),
     'unsuspend-tab': () => send('unsuspend-tab', { tabId }).then(close),
     'suspend-others': async () => {
-      const { suspended } = await send('suspend-others', { windowId })
+      const { count } = await send('suspend-others', { windowId })
       say(
-        suspended === 0
+        count === 0
           ? 'No other tabs to suspend.'
-          : `Suspended ${plural(suspended, 'tab')}.`,
+          : `Suspending ${plural(count, 'tab')}.`,
       )
       await showStats()
     },
@@ -45,11 +45,11 @@ async function main(): Promise<void> {
       await showStats()
     },
     'suspend-group': async () => {
-      const { suspended } = await send('suspend-group', { groupId })
+      const { count } = await send('suspend-group', { groupId })
       say(
-        suspended === 0
+        count === 0
           ? 'No other tabs in this group to suspend.'
-          : `Suspended ${plural(suspended, 'tab')}.`,
+          : `Suspending ${plural(count, 'tab')}.`,
       )
       await showStats()
     },

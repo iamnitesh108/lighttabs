@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ActivityTracker } from '../../src/background/activity-tracker.ts'
 import { Pages } from '../../src/background/pages.ts'
+import type { TabJob } from '../../src/background/suspender.ts'
 import { Suspender } from '../../src/background/suspender.ts'
 import type { Settings } from '../../src/core/settings.ts'
 import {
@@ -10,6 +11,13 @@ import {
   MemorySettings,
   testOrigin,
 } from '../support/fakes.ts'
+
+/** Waits for a job over many tabs to finish; returns how many tabs it covered. */
+async function finished(job: Promise<TabJob>): Promise<number> {
+  const { count, done } = await job
+  await done
+  return count
+}
 
 /** Most tests use the browser's own discarding; click to load has its own section. */
 function setup(settings: Partial<Settings> = {}, online = true) {
@@ -124,7 +132,7 @@ describe('suspending by hand', () => {
     const b = browser.addTab()
     browser.addTab({ pinned: true })
     browser.addTab({ windowId: 2 })
-    expect(await suspender.suspendOthers(1)).toBe(2)
+    expect(await finished(suspender.suspendOthers(1))).toBe(2)
     // Discarding gives tabs new ids, so they're compared by address.
     expect(browser.tabs.filter((t) => t.discarded).map((t) => t.url)).toEqual([
       a.url,
@@ -200,7 +208,7 @@ describe('click to load', () => {
     const { browser, suspender } = setup(clickToLoad)
     browser.addTab({ active: true })
     const other = browser.addTab()
-    expect(await suspender.suspendOthers(1)).toBe(1)
+    expect(await finished(suspender.suspendOthers(1))).toBe(1)
     expect(browser.byUrl(other.url)).toMatchObject({
       placeholder: true,
       discarded: true,
@@ -241,7 +249,7 @@ describe('click to load', () => {
     })
 
     const other = browser.addTab()
-    await suspender.suspendOthers(1)
+    await finished(suspender.suspendOthers(1))
     await suspender.settle(browser.byUrl(other.url).id)
     // A discarded tab can't go back: the address is opened instead.
     await suspender.unsuspendTab(browser.byUrl(other.url).id)
@@ -265,7 +273,7 @@ describe('click to load', () => {
     browser.addTab({ active: true })
     const a = browser.addTab()
     const b = browser.addTab({ discarded: true })
-    await suspender.suspendOthers(1)
+    await finished(suspender.suspendOthers(1))
     const { count, done } = await suspender.unsuspendAll(1)
     await done
     expect(count).toBe(2)
@@ -274,11 +282,29 @@ describe('click to load', () => {
     expect(browser.byUrl(b.url).placeholder).toBe(false)
   })
 
+  it('loads a waiting tab right away when you open it, and only once', async () => {
+    const { browser, suspender } = setup(clickToLoad)
+    browser.addTab({ active: true })
+    const tabs = [browser.addTab(), browser.addTab(), browser.addTab()]
+    await finished(suspender.suspendOthers(1))
+    const last = browser.byUrl(tabs[2].url)
+
+    const loads: number[] = []
+    const navigate = browser.navigate.bind(browser)
+    browser.navigate = (id, url) => (loads.push(id), navigate(id, url))
+
+    const { done } = await suspender.unsuspendAll(1)
+    await suspender.tabOpened(last.id) // opened before its turn came
+    await done
+    expect(loads.filter((id) => id === last.id)).toHaveLength(1)
+    expect(browser.tabs.filter((t) => t.placeholder)).toEqual([])
+  })
+
   it('lets an update wait while a suspended-tab page is on screen', async () => {
     const { browser, suspender } = setup(clickToLoad)
     const current = browser.addTab({ active: true })
     const other = browser.addTab()
-    await suspender.suspendOthers(1)
+    await finished(suspender.suspendOthers(1))
     expect(await suspender.prepareForUpdate()).toBe(true)
     expect(browser.byUrl(other.url).discarded).toBe(true)
 
@@ -293,7 +319,7 @@ describe('tab groups', () => {
     const current = browser.addTab({ active: true, groupId: 5 })
     const inGroup = browser.addTab({ groupId: 5 })
     const outside = browser.addTab()
-    expect(await suspender.suspendGroup(5)).toBe(1)
+    expect(await finished(suspender.suspendGroup(5))).toBe(1)
     expect(browser.byUrl(inGroup.url).discarded).toBe(true)
     expect(browser.byUrl(outside.url).discarded).toBe(false)
     expect(browser.byUrl(current.url).discarded).toBe(false)

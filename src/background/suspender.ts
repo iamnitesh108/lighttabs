@@ -11,6 +11,12 @@ import type { ActivityTracker } from './activity-tracker.ts'
 import type { Pages } from './pages.ts'
 import type { SettingsSource } from './ports.ts'
 
+/**
+ * A job over many tabs: how many tabs it covers (known right away, for the
+ * popup to show), and when it has finished.
+ */
+export type TabJob = { count: number; done: Promise<void> }
+
 type Dependencies = {
   browser: Browser
   activity: ActivityTracker
@@ -29,6 +35,16 @@ type Dependencies = {
 const showPlaceholdersAtOnce = 4
 
 /**
+ * How long a loading page holds its place in the unsuspend queue. Some
+ * sites never quite finish loading (ads, live feeds); without a limit they
+ * would hold up every tab behind them. They keep loading afterwards.
+ */
+const headStartMs = 2000
+
+/** How long to wait for a suspended-tab page's icon before moving on. */
+const iconWaitMs = 2000
+
+/**
  * Suspends tabs in one of two ways, chosen in the settings:
  *
  * - Click to load (default): the tab shows a small page of this extension
@@ -41,6 +57,8 @@ const showPlaceholdersAtOnce = 4
  */
 export class Suspender {
   private readonly deps: Dependencies
+  /** Tabs waiting in an "unsuspend all" queue. */
+  private readonly queued = new Set<number>()
 
   constructor(deps: Dependencies) {
     this.deps = deps
@@ -105,17 +123,20 @@ export class Suspender {
       throw new UserError("The browser didn't allow suspending this tab.")
   }
 
-  /** Suspends the other tabs of a window, respecting the user's exceptions (but not the timer). */
-  async suspendOthers(windowId: number): Promise<number> {
+  /**
+   * Suspends the other tabs of a window, respecting the user's exceptions
+   * (but not the timer). Returns as soon as it has started.
+   */
+  async suspendOthers(windowId: number): Promise<TabJob> {
     return this.suspendOthersOf(await this.deps.browser.queryTabs({ windowId }))
   }
 
   /** The same, for the tabs of one tab group. */
-  async suspendGroup(groupId: number): Promise<number> {
+  async suspendGroup(groupId: number): Promise<TabJob> {
     return this.suspendOthersOf(await this.deps.browser.queryTabs({ groupId }))
   }
 
-  private async suspendOthersOf(tabs: readonly TabInfo[]): Promise<number> {
+  private async suspendOthersOf(tabs: readonly TabInfo[]): Promise<TabJob> {
     const { activity, isOnline } = this.deps
     const settings = await this.deps.settings.get()
     const snapshot = await activity.snapshot(tabs)
@@ -130,7 +151,10 @@ export class Suspender {
           'others',
         ) === null,
     )
-    return this.suspendAll(candidates, settings.clickToLoad)
+    return {
+      count: candidates.length,
+      done: this.suspendAll(candidates, settings.clickToLoad).then(() => {}),
+    }
   }
 
   /** The keyboard shortcut: suspends the tab, or loads it if it's suspended. */
@@ -149,23 +173,31 @@ export class Suspender {
   /**
    * Loads every suspended tab of a window, a few at a time (loading them
    * all at once makes each one slow), starting next to the current tab.
+   * A tab you open while it's waiting loads right away (see tabOpened).
    * Returns how many will load; they keep loading after that.
    */
-  async unsuspendAll(windowId: number): Promise<{
-    count: number
-    done: Promise<void>
-  }> {
+  async unsuspendAll(windowId: number): Promise<TabJob> {
     const { browser } = this.deps
     const all = await browser.queryTabs({ windowId })
     const current = all.find((t) => t.active)?.index ?? 0
     const tabs = nearestFirst(all.filter(isSuspended), current)
     const limit = loadLimit(this.deps.cpuCores)
+    for (const tab of tabs) this.queued.add(tab.id)
     const done = runLimited(tabs, limit, async (tab) => {
-      const loaded = browser.waitForLoad(tab.id)
+      // Already loaded because it was opened meanwhile.
+      if (!this.queued.delete(tab.id)) return
+      const loaded = browser.waitForLoad(tab.id, headStartMs)
       await this.unsuspend(tab)
       await loaded
     })
     return { count: tabs.length, done }
+  }
+
+  /** A tab was opened: if it's waiting in an "unsuspend all" queue, it loads now. */
+  async tabOpened(tabId: number): Promise<void> {
+    if (!this.queued.delete(tabId)) return
+    const tab = await this.deps.browser.getTab(tabId)
+    if (tab) await this.unsuspend(tab)
   }
 
   /**
@@ -265,7 +297,7 @@ export class Suspender {
   private async suspend(tab: TabInfo, clickToLoad: boolean): Promise<boolean> {
     const { browser, pages, now } = this.deps
     if (!clickToLoad) return browser.discard(tab.id)
-    const iconShown = browser.waitForIcon(tab.id)
+    const iconShown = browser.waitForIcon(tab.id, iconWaitMs)
     const page = { url: tab.url, title: tab.title, since: now() }
     if (!(await browser.navigate(tab.id, pages.placeholderFor(page))))
       return false

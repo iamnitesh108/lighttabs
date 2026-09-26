@@ -69,18 +69,20 @@ const handlers: Handlers = {
     }
   },
   'suspend-tab': async ({ tabId }) => (await suspender.suspendTab(tabId), null),
-  'suspend-others': async ({ windowId }) => ({
-    suspended: await suspender.suspendOthers(windowId),
-  }),
-  'suspend-group': async ({ groupId }) => ({
-    suspended: await suspender.suspendGroup(groupId),
-  }),
+  // Jobs over many tabs reply once they've started: the popup shows what's
+  // happening right away, and may be closed before they finish.
+  'suspend-others': async ({ windowId }) => {
+    const { count } = await suspender.suspendOthers(windowId)
+    return { count }
+  },
+  'suspend-group': async ({ groupId }) => {
+    const { count } = await suspender.suspendGroup(groupId)
+    return { count }
+  },
   'unsuspend-tab': async ({ tabId }) => (
     await suspender.unsuspendTab(tabId),
     null
   ),
-  // Replies once the loading has started: it can take a while, and the
-  // popup that asked may be closed by then.
   'unsuspend-all': async ({ windowId }) => {
     const { count } = await suspender.unsuspendAll(windowId)
     return { count }
@@ -160,6 +162,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 // The badge only changes when tabs are suspended, loaded, opened or closed.
 chrome.tabs.onCreated.addListener(() => badge.scheduleUpdate())
 chrome.tabs.onActivated.addListener(async ({ tabId, windowId }) => {
+  void suspender.tabOpened(tabId)
   const left = await activity.tabActivated(tabId, windowId)
   if (left !== undefined) await suspender.settle(left)
 })

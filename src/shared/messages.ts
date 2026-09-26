@@ -32,11 +32,11 @@ export type Requests = {
   'suspend-tab': { request: { tabId: number }; reply: null }
   'suspend-others': {
     request: { windowId: number }
-    reply: { suspended: number }
+    reply: { count: number }
   }
   'suspend-group': {
     request: { groupId: number }
-    reply: { suspended: number }
+    reply: { count: number }
   }
   'unsuspend-tab': { request: { tabId: number }; reply: null }
   'unsuspend-all': { request: { windowId: number }; reply: { count: number } }
