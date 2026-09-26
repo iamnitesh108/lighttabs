@@ -141,6 +141,7 @@ function renderCard(
       type: 'button',
       'data-tab': tab.id,
       'data-window': tab.windowId,
+      'data-index': tab.index,
       'aria-current': tab.active ? 'true' : undefined,
       title: tab.url,
     },
@@ -222,15 +223,35 @@ function hostOf(url: string): string {
   }
 }
 
-/** Switches to a tab, like clicking it in the tab bar. */
-async function openTab(tabId: number, windowId: number): Promise<void> {
-  await browser.activate(tabId)
+/**
+ * Switches to a tab, like clicking it in the tab bar. A tab gets a new id
+ * when it's suspended; if that happened since the page was drawn, the tabs
+ * are read again and the tab at the same place in its window is opened.
+ */
+async function openTab(
+  tabId: number,
+  windowId: number,
+  index: number,
+): Promise<void> {
+  try {
+    await browser.activate(tabId)
+  } catch {
+    await refresh()
+    const moved = tabs.find((t) => t.windowId === windowId && t.index === index)
+    if (!moved) return
+    await browser.activate(moved.id)
+  }
   await browser.focusWindow(windowId)
 }
 
 document.addEventListener('click', (event) => {
   const card = (event.target as Element).closest<HTMLElement>('.card')
-  if (card) void openTab(Number(card.dataset.tab), Number(card.dataset.window))
+  if (card)
+    void openTab(
+      Number(card.dataset.tab),
+      Number(card.dataset.window),
+      Number(card.dataset.index),
+    )
 })
 
 search.addEventListener('input', () => {
@@ -244,7 +265,7 @@ search.addEventListener('keydown', (event) => {
     select(selected + (event.key === 'ArrowDown' ? 1 : -1))
   } else if (event.key === 'Enter') {
     const tab = results[selected]
-    if (tab) void openTab(tab.id, tab.windowId)
+    if (tab) void openTab(tab.id, tab.windowId, tab.index)
   } else if (event.key === 'Escape' && search.value) {
     event.preventDefault()
     search.value = ''

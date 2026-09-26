@@ -49,6 +49,12 @@
   box-sizing: border-box;
 }
 
+/* An element with the hidden attribute stays hidden, even when a class
+   gives it a display (grid, flex) that would otherwise show it. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   font: 14px/1.45 var(--font);
