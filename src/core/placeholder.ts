@@ -43,3 +43,31 @@ export function parsePlaceholder(
     ...(since > 0 && { since }),
   }
 }
+
+/**
+ * The page behind a suspended-tab address of any LightTabs install, not
+ * only this one. An unpacked copy gets a new id when its folder moves, and
+ * the store version has another id again, so the old addresses stop
+ * opening. The real address is still in there, so it's worth keeping.
+ */
+export function parseAnyPlaceholder(url: string): SuspendedPage | null {
+  const base =
+    /^chrome-extension:\/\/[a-p]{32}\/ui\/suspended\/suspended\.html(?=#)/.exec(
+      url,
+    )
+  return base ? parsePlaceholder(url, base[0]) : null
+}
+
+/**
+ * A saved tab with its real address, if it was saved as a suspended-tab
+ * address. A title that was only the address becomes the page's title.
+ */
+export function withRealAddress<T extends { url: string; title: string }>(
+  tab: T,
+): T {
+  const page = parseAnyPlaceholder(tab.url)
+  if (!page) return tab
+  const title =
+    tab.title && tab.title !== tab.url ? tab.title : page.title || page.url
+  return { ...tab, url: page.url, title }
+}

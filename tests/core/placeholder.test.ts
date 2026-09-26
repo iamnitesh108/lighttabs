@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { parsePlaceholder, placeholderUrl } from '../../src/core/placeholder.ts'
+import {
+  parseAnyPlaceholder,
+  parsePlaceholder,
+  placeholderUrl,
+  withRealAddress,
+} from '../../src/core/placeholder.ts'
 
 const base = 'chrome-extension://abc/ui/suspended/suspended.html'
 
@@ -39,5 +44,41 @@ describe('placeholder addresses', () => {
       const placeholder = `${base}#${new URLSearchParams({ url, title: 'x' })}`
       expect(parsePlaceholder(placeholder, base)).toBeNull()
     }
+  })
+})
+
+describe('suspended tabs of other installs', () => {
+  const oldBase =
+    'chrome-extension://iipbehlicbejmbjbaeiamloojljanlff/ui/suspended/suspended.html'
+  const gmail = 'https://mail.google.com/mail/u/0/#inbox'
+
+  it('finds the page behind an older LightTabs address', () => {
+    const url = placeholderUrl(oldBase, { url: gmail, title: 'Inbox' })
+    expect(parseAnyPlaceholder(url)).toEqual({ url: gmail, title: 'Inbox' })
+  })
+
+  it('ignores other extension pages and unsafe addresses', () => {
+    for (const url of [
+      'chrome-extension://iipbehlicbejmbjbaeiamloojljanlff/ui/saved/saved.html',
+      'chrome-extension://iipbehlicbejmbjbaeiamloojljanlff/suspended.html#ttl=x&uri=https://a.com/',
+      `${oldBase}#${new URLSearchParams({ url: 'chrome://settings/' })}`,
+      'https://a.com/ui/suspended/suspended.html#url=https://b.com/',
+    ])
+      expect(parseAnyPlaceholder(url)).toBeNull()
+  })
+
+  it('repairs a saved tab, taking the title when it was only the address', () => {
+    const url = placeholderUrl(oldBase, { url: gmail, title: 'Inbox' })
+    expect(withRealAddress({ id: '1', url, title: 'Mail' })).toEqual({
+      id: '1',
+      url: gmail,
+      title: 'Mail',
+    })
+    expect(withRealAddress({ url, title: url })).toEqual({
+      url: gmail,
+      title: 'Inbox',
+    })
+    const plain = { url: 'https://a.com/', title: 'A' }
+    expect(withRealAddress(plain)).toBe(plain)
   })
 })

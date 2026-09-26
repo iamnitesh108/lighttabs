@@ -63,6 +63,22 @@ describe('LightTabs backup', () => {
     expect(restored.tabs[0]).toMatchObject({ url: 'https://a.com', title: 'A' })
   })
 
+  it('keeps tabs saved as suspended-tab addresses, with the real address', () => {
+    const suspended =
+      'chrome-extension://iipbehlicbejmbjbaeiamloojljanlff/ui/suspended/suspended.html#title=A&url=https%3A%2F%2Fa.com%2F'
+    const backup = JSON.stringify({
+      format: 'lighttabs',
+      sessions: [{ tabs: [{ url: suspended, title: suspended }] }],
+    })
+    const [list] = parseImport(backup, options)
+    expect(list.tabs[0]).toMatchObject({ url: 'https://a.com/', title: 'A' })
+    const [fromText] = parseImport(`${suspended} | Mail`, options)
+    expect(fromText.tabs[0]).toMatchObject({
+      url: 'https://a.com/',
+      title: 'Mail',
+    })
+  })
+
   it('rejects files that are not backups', () => {
     expect(() => parseImport('{"hello": 1}', options)).toThrow(ImportError)
     expect(() => parseImport('{broken', options)).toThrow('not valid JSON')

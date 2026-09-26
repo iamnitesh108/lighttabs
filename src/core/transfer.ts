@@ -1,5 +1,6 @@
 import type { GroupInfo, SavedSession, TabToSave } from './sessions.ts'
 import { groupColors, newSession } from './sessions.ts'
+import { withRealAddress } from './placeholder.ts'
 import { isRestorableUrl } from './urls.ts'
 
 /** Our own backup format: everything, exactly. */
@@ -71,6 +72,7 @@ function fromBackup(
   for (const raw of data.sessions) {
     const groups = readGroups(raw.groups)
     const tabs: TabToSave[] = (Array.isArray(raw.tabs) ? raw.tabs : [])
+      .map(realAddressOf)
       .filter(
         (t): t is { url: string; title?: unknown; group?: unknown } =>
           typeof t?.url === 'string' && isRestorableUrl(t.url),
@@ -107,9 +109,12 @@ function fromText(
     const tabs: TabToSave[] = []
     for (const line of group.split('\n')) {
       const [url = '', ...rest] = line.split(' | ')
-      const cleanUrl = url.trim()
-      if (isRestorableUrl(cleanUrl))
-        tabs.push({ url: cleanUrl, title: rest.join(' | ').trim() || cleanUrl })
+      const tab = withRealAddress({
+        url: url.trim(),
+        title: rest.join(' | ').trim(),
+      })
+      if (isRestorableUrl(tab.url))
+        tabs.push({ ...tab, title: tab.title || tab.url })
     }
     if (tabs.length > 0) {
       sessions.push(
@@ -155,4 +160,14 @@ function isBackup(data: unknown): data is { sessions: RawSession[] } {
     (data as { format?: unknown }).format === 'lighttabs' &&
     Array.isArray((data as { sessions?: unknown }).sessions)
   )
+}
+
+/** A backup tab with its real address, if it was saved as a suspended tab. */
+function realAddressOf<T extends { url?: unknown; title?: unknown }>(
+  tab: T,
+): T {
+  if (typeof tab?.url !== 'string') return tab
+  const title = typeof tab.title === 'string' ? tab.title : ''
+  const real = withRealAddress({ url: tab.url, title })
+  return real.url === tab.url ? tab : { ...tab, ...real }
 }

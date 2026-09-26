@@ -1,3 +1,4 @@
+import { withRealAddress } from '../core/placeholder.ts'
 import type { SavedSession } from '../core/sessions.ts'
 import { SerialQueue } from './serial-queue.ts'
 
@@ -15,12 +16,13 @@ export class SessionStore {
     const all = await chrome.storage.local.get(null)
     return Object.entries(all)
       .filter(([k]) => k.startsWith(prefix))
-      .map(([, v]) => v as SavedSession)
+      .map(([, v]) => withRealAddresses(v as SavedSession))
   }
 
   async get(id: string): Promise<SavedSession | null> {
     const found = await chrome.storage.local.get(prefix + id)
-    return (found[prefix + id] as SavedSession | undefined) ?? null
+    const session = found[prefix + id] as SavedSession | undefined
+    return session ? withRealAddresses(session) : null
   }
 
   add(sessions: readonly SavedSession[]): Promise<void> {
@@ -66,4 +68,14 @@ export class SessionStore {
         listener()
     })
   }
+}
+
+/**
+ * Lists may hold suspended-tab addresses of an older install, saved before
+ * those were recognised. Reading them with the real address repairs them
+ * everywhere (shown, searched, exported, restored), and the next change to
+ * a list stores the repaired version.
+ */
+function withRealAddresses(session: SavedSession): SavedSession {
+  return { ...session, tabs: session.tabs.map(withRealAddress) }
 }

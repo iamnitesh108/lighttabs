@@ -1,4 +1,4 @@
-import { parsePlaceholder } from '../core/placeholder.ts'
+import { parseAnyPlaceholder, parsePlaceholder } from '../core/placeholder.ts'
 import type { GroupInfo } from '../core/sessions.ts'
 import { groupColors } from '../core/sessions.ts'
 import type { TabInfo } from '../core/tab.ts'
@@ -243,7 +243,12 @@ export class ChromeBrowser implements Browser {
     // to the suspended-tab page already counts as suspended, and one leaving
     // it no longer does.
     const address = tab.pendingUrl || tab.url || ''
-    const page = parsePlaceholder(address, this.placeholderBase)
+    // A suspended tab of an older install (or another suspender) still
+    // holds its real address; without this, saving it would keep an
+    // address that no longer opens.
+    const page =
+      parsePlaceholder(address, this.placeholderBase) ??
+      parseAnyPlaceholder(address)
     return {
       id: tab.id ?? -1,
       windowId: tab.windowId,
