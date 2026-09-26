@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "LightTabs",
   "short_name": "LightTabs",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Free memory by suspending idle tabs, and save tab lists for later. Suspended tabs stay safe even if the extension is removed.",
   "minimum_chrome_version": "121",
   "icons": {
