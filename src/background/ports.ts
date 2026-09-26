@@ -21,6 +21,11 @@ export interface SessionRepository {
   remove(id: string): Promise<void>
 }
 
+/** The extension's toolbar icon: a small badge text, and a tooltip. */
+export interface BadgeDisplay {
+  show(badge: string, tooltip: string): Promise<void>
+}
+
 export interface ActivityRepository {
   read(): Promise<Activity>
   update(change: (activity: Activity) => void): Promise<void>

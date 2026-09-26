@@ -35,6 +35,12 @@ export function formatSavedAt(time: number, now: number): string {
   return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}, ${clock}`
 }
 
+/** The toolbar badge: empty when there's nothing to count (the badge then hides). */
+export function badgeText(count: number): string {
+  if (count === 0) return ''
+  return count > 999 ? '999+' : String(count)
+}
+
 export function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? '' : 's'}`
 }

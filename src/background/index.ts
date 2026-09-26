@@ -8,10 +8,12 @@ import { countTabs } from '../core/sessions.ts'
 import { isSuspended } from '../core/tab.ts'
 import { ActivityStore } from '../platform/activity-store.ts'
 import { ChromeBrowser } from '../platform/browser.ts'
+import { ChromeBadge } from '../platform/chrome-badge.ts'
 import { SessionStore } from '../platform/session-store.ts'
 import { SettingsStore } from '../platform/settings-store.ts'
 import type { Message } from '../shared/messages.ts'
 import { ActivityTracker } from './activity-tracker.ts'
+import { Badge } from './badge.ts'
 import { Pages } from './pages.ts'
 import type { Handlers } from './router.ts'
 import { route } from './router.ts'
@@ -35,6 +37,7 @@ const suspender = new Suspender({
   isOnline: () => navigator.onLine,
   cpuCores: navigator.hardwareConcurrency,
 })
+const badge = new Badge(browser, settings, new ChromeBadge())
 const saver = new TabSaver({
   browser,
   sessions,
@@ -126,17 +129,21 @@ chrome.runtime.onMessage.addListener(
 chrome.runtime.onInstalled.addListener(async () => {
   await activity.reset(await browser.queryTabs())
   await ensureTimer()
+  await badge.update()
 })
 
 chrome.runtime.onStartup.addListener(async () => {
   await activity.reset(await browser.queryTabs())
   await ensureTimer()
+  await badge.update()
 })
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === timerAlarm) void suspender.runTimer()
 })
 
+// The badge only changes when tabs are suspended, loaded, opened or closed.
+chrome.tabs.onCreated.addListener(() => badge.scheduleUpdate())
 chrome.tabs.onActivated.addListener(async ({ tabId, windowId }) => {
   const left = await activity.tabActivated(tabId, windowId)
   if (left !== undefined) await suspender.settle(left)
@@ -144,11 +151,17 @@ chrome.tabs.onActivated.addListener(async ({ tabId, windowId }) => {
 chrome.tabs.onUpdated.addListener((tabId, change) => {
   if (change.status === 'complete') void activity.tabNavigated(tabId)
   if (change.favIconUrl) void suspender.settle(tabId)
+  if (change.url || change.discarded !== undefined) badge.scheduleUpdate()
 })
-chrome.tabs.onRemoved.addListener((tabId) => void activity.tabClosed(tabId))
-chrome.tabs.onReplaced.addListener(
-  (added, removed) => void activity.tabReplaced(added, removed),
-)
+chrome.tabs.onRemoved.addListener((tabId) => {
+  void activity.tabClosed(tabId)
+  badge.scheduleUpdate()
+})
+chrome.tabs.onReplaced.addListener((added, removed) => {
+  void activity.tabReplaced(added, removed)
+  badge.scheduleUpdate()
+})
+settings.onChange(() => badge.scheduleUpdate())
 
 chrome.commands.onCommand.addListener(async (command, tab) => {
   if (!tab?.id) return

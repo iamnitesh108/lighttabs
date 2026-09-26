@@ -14,6 +14,12 @@ export type Settings = {
    * Off: the browser's own discarding, which reloads a tab as soon as it's opened.
    */
   clickToLoad: boolean
+  /**
+   * The number of suspended tabs as a badge on the toolbar icon. Off by
+   * default: the badge covers part of the icon, and the number is in the
+   * icon's tooltip anyway.
+   */
+  showBadge: boolean
 
   keepPinnedWhenSaving: boolean
   openSavedPageAfterSaving: boolean
@@ -34,6 +40,7 @@ export const defaultSettings: Settings = {
   keepWhenOffline: true,
   neverSuspendSites: [],
   clickToLoad: true,
+  showBadge: false,
   keepPinnedWhenSaving: true,
   openSavedPageAfterSaving: true,
   keepListsAfterRestoring: false,
@@ -81,6 +88,7 @@ const booleanKeys: BooleanKey[] = [
   'keepAudible',
   'keepWhenOffline',
   'clickToLoad',
+  'showBadge',
   'keepPinnedWhenSaving',
   'openSavedPageAfterSaving',
   'keepListsAfterRestoring',
