@@ -11,6 +11,7 @@ body {
 }
 
 .brand {
+  flex: 1;
   font-size: 15px;
   font-weight: 700;
 }

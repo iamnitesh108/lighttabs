@@ -53,6 +53,7 @@ export type Requests = {
     reply: { saved: number }
   }
   'open-saved': { request: { windowId?: number }; reply: null }
+  'open-overview': { request: { windowId?: number }; reply: null }
   'restore-session': {
     request: { sessionId: string; windowId: number; newWindow: boolean }
     reply: null

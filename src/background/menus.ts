@@ -31,6 +31,7 @@ export const menus: Menu[] = [
       { action: 'unsuspend-all', title: 'Unsuspend all tabs' },
       { action: 'save-window', title: 'Save this window' },
       { action: 'open-saved', title: 'Open saved tabs' },
+      { action: 'open-overview', title: 'Overview of all tabs' },
     ],
   },
 ]

@@ -8,12 +8,14 @@ export class Pages {
   /** Every page of this extension starts with it: chrome-extension://<id>/. */
   readonly origin: string
   readonly savedPageUrl: string
+  readonly overviewUrl: string
   readonly placeholderBase: string
 
   constructor(browser: Browser, origin: string) {
     this.browser = browser
     this.origin = origin
     this.savedPageUrl = `${origin}ui/saved/saved.html`
+    this.overviewUrl = `${origin}ui/overview/overview.html`
     this.placeholderBase = origin + placeholderPath
   }
 
@@ -27,20 +29,24 @@ export class Pages {
     return url.startsWith(this.origin)
   }
 
-  /** Shows the saved tabs page: switches to it if it's open, else opens it in windowId. */
-  async showSaved(windowId?: number): Promise<void> {
+  showSaved(windowId?: number): Promise<void> {
+    return this.show(this.savedPageUrl, windowId)
+  }
+
+  showOverview(windowId?: number): Promise<void> {
+    return this.show(this.overviewUrl, windowId)
+  }
+
+  /** Switches to a page of this extension if it's open, else opens it in windowId. */
+  private async show(url: string, windowId?: number): Promise<void> {
     const open = (await this.browser.queryTabs()).find((t) =>
-      t.url.startsWith(this.savedPageUrl),
+      t.url.startsWith(url),
     )
     if (open) {
       await this.browser.activate(open.id)
       await this.browser.focusWindow(open.windowId)
       return
     }
-    await this.browser.createTab({
-      url: this.savedPageUrl,
-      windowId,
-      active: true,
-    })
+    await this.browser.createTab({ url, windowId, active: true })
   }
 }

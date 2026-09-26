@@ -23,6 +23,7 @@ export function tabActions(
     'save-window': ({ windowId }: Target) => saver.saveWindow(windowId),
     'exclude-site': ({ tabId }: Target) => suspender.excludeSite(tabId),
     'open-saved': ({ windowId }: Target) => pages.showSaved(windowId),
+    'open-overview': ({ windowId }: Target) => pages.showOverview(windowId),
   } satisfies Record<string, (target: Target) => Promise<unknown>>
 }
 

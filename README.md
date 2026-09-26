@@ -33,6 +33,12 @@ Works in Brave, Chrome, Edge and other Chromium browsers (version 121 or newer).
 - Saved lists remember tab groups (name, colour, collapsed) and restore them as groups.
 - From the popup: suspend the other tabs of a group, or save a whole group into a list named after it.
 
+**Overview of all tabs**
+
+- Every open tab as a card, grouped by window and tab group, with a search box: type to filter, Enter to switch to the first match, Escape to clear.
+- Click a card to switch to that tab. Opens from the popup (grid icon), the toolbar icon's menu, or a shortcut you set.
+- Uses no resources until you open it.
+
 **Right-click menu**
 
 - On any page: suspend this tab or the others, save this tab or window, never suspend this site.

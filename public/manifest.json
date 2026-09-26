@@ -55,6 +55,9 @@
       "suggested_key": { "default": "Alt+Shift+K" },
       "description": "Save this window's tabs and close them"
     },
+    "open-overview": {
+      "description": "Show an overview of all tabs"
+    },
     "open-saved": {
       "description": "Open the saved tabs page"
     }

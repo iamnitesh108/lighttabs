@@ -1,8 +1,8 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 
-// The extension has five entry points: the background service worker and
-// four pages. Vite builds them as one project so they share code.
+// The extension has six entry points: the background service worker and
+// five pages. Vite builds them as one project so they share code.
 export default defineConfig({
   root: 'src',
   publicDir: '../public',
@@ -20,6 +20,7 @@ export default defineConfig({
         saved: 'src/ui/saved/saved.html',
         options: 'src/ui/options/options.html',
         suspended: 'src/ui/suspended/suspended.html',
+        overview: 'src/ui/overview/overview.html',
       },
       output: {
         // The manifest refers to the service worker by a fixed name.

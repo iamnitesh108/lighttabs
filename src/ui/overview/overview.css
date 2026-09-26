@@ -1,0 +1,171 @@
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.topbar-inner,
+.content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-6);
+}
+
+.topbar-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.search {
+  width: 280px;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.window + .window {
+  margin-top: var(--space-6);
+}
+
+.window-title {
+  margin-bottom: var(--space-2);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.section + .section {
+  margin-top: var(--space-3);
+}
+
+/* A tab group: a bar in the group's colour down the left side. */
+.group {
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--group-color);
+}
+
+.group-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--group-color);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-2);
+}
+
+.card {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+/* The tab in front of its window. */
+.card[aria-current='true'] {
+  border-color: var(--accent);
+}
+
+.card-text {
+  display: grid;
+  min-width: 0;
+}
+
+.card-title,
+.card-host {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-title {
+  font-weight: 500;
+}
+
+.card-host {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Suspended tabs look faded, like in the tab bar. */
+.card.suspended .favicon {
+  opacity: 0.5;
+}
+
+.card.suspended .card-title {
+  color: var(--text-muted);
+}
+
+.empty {
+  padding: var(--space-6) 0;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* The result Enter opens; arrow keys move it. */
+.card.selected {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+mark {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: inherit;
+}
+
+.card-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.card-group::after {
+  content: '·';
+  margin: 0 var(--space-1);
+}

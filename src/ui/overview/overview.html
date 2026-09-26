@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>All tabs · LightTabs</title>
+    <link rel="stylesheet" href="../shared/base.css" />
+    <link rel="stylesheet" href="./overview.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div>
+          <h1 class="title">All tabs</h1>
+          <p id="summary" class="muted"></p>
+        </div>
+        <label class="visually-hidden" for="search">Search tabs</label>
+        <input
+          id="search"
+          class="search"
+          type="search"
+          placeholder="Search tabs"
+          autocomplete="off"
+          autofocus
+        />
+      </div>
+    </header>
+    <main class="content">
+      <div id="windows"></div>
+      <div id="results" class="cards" hidden></div>
+      <p id="empty" class="empty" hidden></p>
+    </main>
+    <script type="module" src="./overview.ts"></script>
+  </body>
+</html>

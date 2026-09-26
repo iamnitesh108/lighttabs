@@ -84,6 +84,9 @@ async function main(): Promise<void> {
   byId('open-saved').addEventListener('click', () =>
     run(null, () => send('open-saved', { windowId }).then(close)),
   )
+  byId('open-overview').addEventListener('click', () =>
+    run(null, () => send('open-overview', { windowId }).then(close)),
+  )
   byId('open-options').addEventListener('click', () => {
     void chrome.runtime.openOptionsPage()
     close()

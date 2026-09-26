@@ -108,6 +108,10 @@ const handlers: Handlers = {
     saved: await saver.saveAllWindows(windowId),
   }),
   'open-saved': async ({ windowId }) => (await pages.showSaved(windowId), null),
+  'open-overview': async ({ windowId }) => (
+    await pages.showOverview(windowId),
+    null
+  ),
   'restore-session': async ({ sessionId, windowId, newWindow }) => (
     await saver.restoreSession(sessionId, windowId, newWindow),
     null
