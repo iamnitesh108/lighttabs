@@ -60,7 +60,16 @@ Brave can also unload tabs by itself (search for "Memory Saver" in its settings)
 
 ## Install
 
-From source:
+### From a release
+
+1. Download `lighttabs-<version>.zip` from the [latest release](https://github.com/iamnitesh108/lighttabs/releases/latest).
+2. Unzip it into a folder you'll keep (the browser loads the extension from there, so don't delete it).
+3. Open `brave://extensions` (or `chrome://extensions`, `edge://extensions`) and turn on **Developer mode**.
+4. Click **Load unpacked** and pick the unzipped folder.
+
+To update, download the new release, unzip it over the same folder, and click the reload button on LightTabs in `brave://extensions`. Your settings and saved lists are kept.
+
+### From source
 
 ```sh
 npm install
