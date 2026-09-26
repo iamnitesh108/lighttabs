@@ -28,6 +28,7 @@ function setup(settings: Partial<Settings> = {}, online = true) {
     pages: new Pages(browser, testOrigin),
     now: clock.now,
     isOnline: () => online,
+    cpuCores: 4,
   })
   return { clock, browser, activity, store, suspender }
 }

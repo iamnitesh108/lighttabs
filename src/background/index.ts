@@ -33,6 +33,7 @@ const suspender = new Suspender({
   pages,
   now,
   isOnline: () => navigator.onLine,
+  cpuCores: navigator.hardwareConcurrency,
 })
 const saver = new TabSaver({
   browser,

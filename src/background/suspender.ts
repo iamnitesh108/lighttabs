@@ -1,4 +1,5 @@
 import { runLimited } from '../core/limit.ts'
+import { loadLimit, nearestFirst } from '../core/load-order.ts'
 import { excludingRule, siteOf } from '../core/sites.ts'
 import { suspendBlocker, timeUntilDue } from '../core/suspend-policy.ts'
 import type { TabInfo } from '../core/tab.ts'
@@ -17,10 +18,8 @@ type Dependencies = {
   pages: Pages
   now: () => number
   isOnline: () => boolean
+  cpuCores: number
 }
-
-/** Loading many pages at once makes each of them slow; a few at a time feels faster. */
-const loadAtOnce = 3
 
 /**
  * Suspended-tab pages shown at the same time. Each one briefly costs about
@@ -140,18 +139,20 @@ export class Suspender {
   }
 
   /**
-   * Loads every suspended tab of a window, a few at a time, starting from
-   * the left. Returns how many will load; they keep loading after that.
+   * Loads every suspended tab of a window, a few at a time (loading them
+   * all at once makes each one slow), starting next to the current tab.
+   * Returns how many will load; they keep loading after that.
    */
   async unsuspendAll(windowId: number): Promise<{
     count: number
     done: Promise<void>
   }> {
     const { browser } = this.deps
-    const tabs = (await browser.queryTabs({ windowId }))
-      .filter(isSuspended)
-      .toSorted((a, b) => a.index - b.index)
-    const done = runLimited(tabs, loadAtOnce, async (tab) => {
+    const all = await browser.queryTabs({ windowId })
+    const current = all.find((t) => t.active)?.index ?? 0
+    const tabs = nearestFirst(all.filter(isSuspended), current)
+    const limit = loadLimit(this.deps.cpuCores)
+    const done = runLimited(tabs, limit, async (tab) => {
       const loaded = browser.waitForLoad(tab.id)
       await this.unsuspend(tab)
       await loaded
