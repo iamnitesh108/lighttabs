@@ -15,7 +15,9 @@ Works in Brave, Chrome, Edge and other Chromium browsers (version 121 or newer).
 - Suspend the current tab, or every other tab in the window, with one click or a keyboard shortcut.
 - Leaves alone pinned tabs, tabs playing audio, and sites you choose. Doesn't suspend anything while you're offline, since the page couldn't load again.
 - Keep one tab loaded for now, without adding its site to a list.
-- A suspended tab loads only when you click its page, and comes back where you left it (scroll position included). Unsuspend all tabs of a window at once: they load a few at a time, so the browser stays responsive.
+- A suspended tab loads only when you click its page, and comes back where you left it (scroll position included).
+- Unsuspend all tabs of a window at once: the ones next to your current tab load first, a few at a time, so the browser stays responsive.
+- Point at the toolbar icon to see how many tabs are suspended (or show the number on the icon).
 
 **Saving**
 
@@ -23,6 +25,17 @@ Works in Brave, Chrome, Edge and other Chromium browsers (version 121 or newer).
 - Restore a list without loading it: the tabs appear right away and each page loads when you open it. Restoring 50 tabs doesn't freeze the browser.
 - Open a single saved tab, rename lists, lock the ones you want to keep, search everything you've saved.
 - Import from a OneTab export (paste it into a text file), and export as a backup file or as plain text.
+- Optionally, once a day, save and close suspended tabs you haven't opened for a few days, so they use no memory at all.
+
+**Tab groups**
+
+- Saved lists remember tab groups (name, colour, collapsed) and restore them as groups.
+- From the popup: suspend the other tabs of a group, or save a whole group into a list named after it.
+
+**Right-click menu**
+
+- On any page: suspend this tab or the others, save this tab or window, never suspend this site.
+- On the toolbar icon: suspend other tabs, unsuspend all, save this window, open saved tabs.
 
 ## How it works
 
@@ -62,12 +75,14 @@ Change them at `brave://extensions/shortcuts` (or the settings page's **Change s
 
 ## Permissions
 
-| Permission                    | Why                                                                            |
-| ----------------------------- | ------------------------------------------------------------------------------ |
-| `tabs`                        | To see each tab's address and title, and to suspend, open and close tabs.      |
-| `storage`, `unlimitedStorage` | To keep your settings and saved lists. Large lists shouldn't hit a size limit. |
-| `alarms`                      | To check once a minute which tabs have been idle long enough.                  |
-| `favicon`                     | To show site icons in the saved lists without loading the sites.               |
+| Permission                    | Why                                                                                            |
+| ----------------------------- | ---------------------------------------------------------------------------------------------- |
+| `tabs`                        | To see each tab's address and title, and to suspend, open and close tabs.                      |
+| `storage`, `unlimitedStorage` | To keep your settings and saved lists. Large lists shouldn't hit a size limit.                 |
+| `alarms`                      | To check once a minute which tabs have been idle long enough (and once a day for unused ones). |
+| `favicon`                     | To show site icons in the saved lists without loading the sites.                               |
+| `contextMenus`                | For the right-click menu.                                                                      |
+| `tabGroups`                   | To save tab groups with their name and colour, and restore them.                               |
 
 It asks for no access to websites and has no content scripts.
 
