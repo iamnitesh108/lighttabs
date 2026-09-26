@@ -119,6 +119,10 @@ export class FakeBrowser implements Browser {
     return true
   }
 
+  async waitForIcon(): Promise<boolean> {
+    return true
+  }
+
   // Fake tabs know their address from the start, so this is a plain discard.
   discardWhenCommitted(id: number): Promise<boolean> {
     return this.discard(id)

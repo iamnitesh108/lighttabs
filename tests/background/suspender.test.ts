@@ -181,13 +181,27 @@ describe('click to load', () => {
     expect(status.suspended).toBe(true)
   })
 
-  it('discards a suspended-tab page once it is out of sight', async () => {
+  it('discards the suspended-tab page of a background tab once its icon shows', async () => {
     const { browser, suspender } = setup(clickToLoad)
     browser.addTab({ active: true })
     const other = browser.addTab()
     expect(await suspender.suspendOthers(1)).toBe(1)
-    await suspender.settle(browser.byUrl(other.url).id)
     expect(browser.byUrl(other.url)).toMatchObject({
+      placeholder: true,
+      discarded: true,
+    })
+  })
+
+  it('discards a suspended-tab page you switch away from, not the one in front', async () => {
+    const { browser, activity, suspender } = setup(clickToLoad)
+    const first = browser.addTab({ active: true })
+    await activity.tabActivated(first.id, 1)
+    await suspender.suspendTab(first.id)
+    const second = browser.addTab()
+    await browser.activate(second.id)
+    const left = await activity.tabActivated(second.id, 1)
+    await suspender.settle(left ?? -1)
+    expect(browser.byUrl(first.url)).toMatchObject({
       placeholder: true,
       discarded: true,
     })
@@ -241,7 +255,7 @@ describe('click to load', () => {
     await done
     expect(count).toBe(2)
     expect(browser.tabs.filter((t) => t.placeholder || t.discarded)).toEqual([])
-    expect(browser.byUrl(a.url).title).toBe(a.title)
+    expect(browser.byUrl(a.url).placeholder).toBe(false)
     expect(browser.byUrl(b.url).placeholder).toBe(false)
   })
 

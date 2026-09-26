@@ -25,6 +25,8 @@ export interface Browser {
    * closed or took longer than the timeout. Call it before starting the load.
    */
   waitForLoad(id: number, timeoutMs?: number): Promise<boolean>
+  /** Like waitForLoad, for the tab's icon changing. */
+  waitForIcon(id: number, timeoutMs?: number): Promise<boolean>
   activate(id: number): Promise<void>
   createTab(options: {
     url: string
@@ -123,6 +125,22 @@ export class ChromeBrowser implements Browser {
   }
 
   waitForLoad(id: number, timeoutMs = 30_000): Promise<boolean> {
+    return this.waitForChange(
+      id,
+      (change) => change.status === 'complete',
+      timeoutMs,
+    )
+  }
+
+  waitForIcon(id: number, timeoutMs = 5_000): Promise<boolean> {
+    return this.waitForChange(id, (change) => !!change.favIconUrl, timeoutMs)
+  }
+
+  private waitForChange(
+    id: number,
+    matches: (change: chrome.tabs.OnUpdatedInfo) => boolean,
+    timeoutMs: number,
+  ): Promise<boolean> {
     return new Promise((resolve) => {
       const finish = (result: boolean) => {
         clearTimeout(timer)
@@ -130,8 +148,8 @@ export class ChromeBrowser implements Browser {
         chrome.tabs.onRemoved.removeListener(onRemoved)
         resolve(result)
       }
-      const onUpdated = (tabId: number, change: { status?: string }) => {
-        if (tabId === id && change.status === 'complete') finish(true)
+      const onUpdated = (tabId: number, change: chrome.tabs.OnUpdatedInfo) => {
+        if (tabId === id && matches(change)) finish(true)
       }
       const onRemoved = (tabId: number) => {
         if (tabId === id) finish(false)

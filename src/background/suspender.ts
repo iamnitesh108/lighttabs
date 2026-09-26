@@ -23,6 +23,13 @@ type Dependencies = {
 const loadAtOnce = 3
 
 /**
+ * Suspended-tab pages shown at the same time. Each one briefly costs about
+ * a megabyte in the extension's process, and the process keeps much of its
+ * highest use afterwards: showing 60 at once left it 20 MB bigger.
+ */
+const showPlaceholdersAtOnce = 4
+
+/**
  * Suspends tabs in one of two ways, chosen in the settings:
  *
  * - Click to load (default): the tab shows a small page of this extension
@@ -52,15 +59,17 @@ export class Suspender {
     const time = now()
     const online = isOnline()
 
-    let suspended = 0
-    for (const tab of tabs) {
-      const context = { paused: snapshot.isPaused(tab.id), online }
-      if (suspendBlocker(tab, context, settings, 'auto') !== null) continue
-      if (timeUntilDue(snapshot.lastActive(tab.id), time, settings) > 0)
-        continue
-      if (await this.suspend(tab, settings.clickToLoad)) suspended++
-    }
-    return suspended
+    const due = tabs.filter(
+      (tab) =>
+        suspendBlocker(
+          tab,
+          { paused: snapshot.isPaused(tab.id), online },
+          settings,
+          'auto',
+        ) === null &&
+        timeUntilDue(snapshot.lastActive(tab.id), time, settings) === 0,
+    )
+    return this.suspendAll(due, settings.clickToLoad)
   }
 
   /**
@@ -104,13 +113,17 @@ export class Suspender {
     const tabs = await browser.queryTabs({ windowId })
     const snapshot = await activity.snapshot(tabs)
 
-    let suspended = 0
-    for (const tab of tabs) {
-      const context = { paused: snapshot.isPaused(tab.id), online: isOnline() }
-      if (suspendBlocker(tab, context, settings, 'others') !== null) continue
-      if (await this.suspend(tab, settings.clickToLoad)) suspended++
-    }
-    return suspended
+    const online = isOnline()
+    const candidates = tabs.filter(
+      (tab) =>
+        suspendBlocker(
+          tab,
+          { paused: snapshot.isPaused(tab.id), online },
+          settings,
+          'others',
+        ) === null,
+    )
+    return this.suspendAll(candidates, settings.clickToLoad)
   }
 
   /** The keyboard shortcut: suspends the tab, or loads it if it's suspended. */
@@ -215,12 +228,30 @@ export class Suspender {
     return true
   }
 
+  private async suspendAll(
+    tabs: readonly TabInfo[],
+    clickToLoad: boolean,
+  ): Promise<number> {
+    let suspended = 0
+    await runLimited(tabs, showPlaceholdersAtOnce, async (tab) => {
+      if (await this.suspend(tab, clickToLoad)) suspended++
+    })
+    return suspended
+  }
+
+  /**
+   * With click to load, a background tab is discarded as soon as its faded
+   * icon is in the tab strip, so its page is only alive for a moment. The
+   * tab in front keeps showing the page.
+   */
   private async suspend(tab: TabInfo, clickToLoad: boolean): Promise<boolean> {
-    if (!clickToLoad) return this.deps.browser.discard(tab.id)
-    return this.deps.browser.navigate(
-      tab.id,
-      this.deps.pages.placeholderFor(tab),
-    )
+    const { browser, pages } = this.deps
+    if (!clickToLoad) return browser.discard(tab.id)
+    const iconShown = browser.waitForIcon(tab.id)
+    if (!(await browser.navigate(tab.id, pages.placeholderFor(tab))))
+      return false
+    if (!tab.active && (await iconShown)) await browser.discard(tab.id)
+    return true
   }
 
   /**
