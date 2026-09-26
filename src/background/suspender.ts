@@ -221,12 +221,21 @@ export class Suspender {
       })
       return false
     }
+    await this.excludeSite(tabId)
+    return true
+  }
+
+  /** Adds the tab's site to "never suspend" (nothing changes if it's already covered). */
+  async excludeSite(tabId: number): Promise<void> {
+    const tab = await this.deps.browser.getTab(tabId)
+    if (!tab) throw new UserError('That tab is already closed.')
+    const settings = await this.deps.settings.get()
+    if (excludingRule(tab.url, settings.neverSuspendSites)) return
     const site = siteOf(tab.url)
     if (!site) throw new UserError('Only web pages can be excluded.')
     await this.deps.settings.update({
       neverSuspendSites: [...settings.neverSuspendSites, site],
     })
-    return true
   }
 
   private async suspendAll(

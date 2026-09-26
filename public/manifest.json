@@ -24,7 +24,14 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "permissions": ["tabs", "storage", "unlimitedStorage", "alarms", "favicon"],
+  "permissions": [
+    "tabs",
+    "storage",
+    "unlimitedStorage",
+    "alarms",
+    "favicon",
+    "contextMenus"
+  ],
   "commands": {
     "_execute_action": {
       "suggested_key": { "default": "Alt+Shift+L" },

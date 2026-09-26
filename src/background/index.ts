@@ -9,15 +9,19 @@ import { isSuspended } from '../core/tab.ts'
 import { ActivityStore } from '../platform/activity-store.ts'
 import { ChromeBrowser } from '../platform/browser.ts'
 import { ChromeBadge } from '../platform/chrome-badge.ts'
+import { createMenus } from '../platform/context-menus.ts'
 import { SessionStore } from '../platform/session-store.ts'
 import { SettingsStore } from '../platform/settings-store.ts'
 import type { Message } from '../shared/messages.ts'
 import { ActivityTracker } from './activity-tracker.ts'
 import { Badge } from './badge.ts'
+import { actionOf, menus } from './menus.ts'
 import { Pages } from './pages.ts'
 import type { Handlers } from './router.ts'
 import { route } from './router.ts'
 import { Suspender } from './suspender.ts'
+import type { Target } from './tab-actions.ts'
+import { tabActions } from './tab-actions.ts'
 import { TabSaver } from './tab-saver.ts'
 
 const timerAlarm = 'suspend-timer'
@@ -46,6 +50,8 @@ const saver = new TabSaver({
   now,
   makeId: () => crypto.randomUUID(),
 })
+
+const actions = tabActions(suspender, saver, pages)
 
 const handlers: Handlers = {
   'tab-status': ({ tabId }) => suspender.status(tabId),
@@ -130,6 +136,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   await activity.reset(await browser.queryTabs())
   await ensureTimer()
   await badge.update()
+  await createMenus(menus)
 })
 
 chrome.runtime.onStartup.addListener(async () => {
@@ -163,19 +170,23 @@ chrome.tabs.onReplaced.addListener((added, removed) => {
 })
 settings.onChange(() => badge.scheduleUpdate())
 
-chrome.commands.onCommand.addListener(async (command, tab) => {
-  if (!tab?.id) return
+chrome.commands.onCommand.addListener((command, tab) => runAction(command, tab))
+chrome.contextMenus.onClicked.addListener((info, tab) =>
+  runAction(actionOf(String(info.menuItemId)), tab),
+)
+
+/** Runs a shortcut's or menu item's action on the tab it was used on. */
+async function runAction(name: string, tab?: chrome.tabs.Tab): Promise<void> {
+  if (tab?.id === undefined || !(name in actions)) return
+  const target: Target = { tabId: tab.id, windowId: tab.windowId }
   try {
-    if (command === 'suspend-tab') await suspender.toggleTab(tab.id)
-    else if (command === 'suspend-others')
-      await suspender.suspendOthers(tab.windowId)
-    else if (command === 'save-window') await saver.saveWindow(tab.windowId)
-    else if (command === 'open-saved') await pages.showSaved(tab.windowId)
+    await actions[name as keyof typeof actions](target)
   } catch (error) {
-    // Shortcuts have no page to show a message in; the action simply doesn't happen.
-    console.warn('LightTabs shortcut', command, error)
+    // Shortcuts and menus have no page to show a message in; the action
+    // simply doesn't happen.
+    console.warn('LightTabs', name, error)
   }
-})
+}
 
 // Without this listener the browser would update the extension right away,
 // closing suspended-tab pages that are on screen. With it, the update waits

@@ -166,6 +166,20 @@ describe('status and site exclusion', () => {
   })
 })
 
+describe('never suspend this site, from the menu', () => {
+  it('adds the site once, and leaves a broader rule alone', async () => {
+    const { browser, store, suspender } = setup({
+      neverSuspendSites: ['google.com'],
+    })
+    const mail = browser.addTab({ url: 'https://mail.google.com/' })
+    const news = browser.addTab({ url: 'https://www.news.com/a' })
+    await suspender.excludeSite(mail.id)
+    await suspender.excludeSite(news.id)
+    await suspender.excludeSite(news.id)
+    expect(store.value.neverSuspendSites).toEqual(['google.com', 'news.com'])
+  })
+})
+
 describe('click to load', () => {
   const clickToLoad = { clickToLoad: true }
 
