@@ -34,12 +34,20 @@ export type Requests = {
     request: { windowId: number }
     reply: { suspended: number }
   }
+  'suspend-group': {
+    request: { groupId: number }
+    reply: { suspended: number }
+  }
   'unsuspend-tab': { request: { tabId: number }; reply: null }
   'unsuspend-all': { request: { windowId: number }; reply: { count: number } }
   'toggle-site': { request: { tabId: number }; reply: { excluded: boolean } }
   'toggle-pause': { request: { tabId: number }; reply: { paused: boolean } }
   'save-tab': { request: { tabId: number }; reply: { saved: number } }
   'save-window': { request: { windowId: number }; reply: { saved: number } }
+  'save-group': {
+    request: { groupId: number; windowId: number }
+    reply: { saved: number }
+  }
   'save-all-windows': {
     request: { windowId: number }
     reply: { saved: number }

@@ -1,5 +1,5 @@
-import type { SavedSession, TabToSave } from './sessions.ts'
-import { newSession } from './sessions.ts'
+import type { GroupInfo, SavedSession, TabToSave } from './sessions.ts'
+import { groupColors, newSession } from './sessions.ts'
 import { isRestorableUrl } from './urls.ts'
 
 /** Our own backup format: everything, exactly. */
@@ -69,15 +69,21 @@ function fromBackup(
 
   const sessions: SavedSession[] = []
   for (const raw of data.sessions) {
-    const tabs = (Array.isArray(raw.tabs) ? raw.tabs : [])
+    const groups = readGroups(raw.groups)
+    const tabs: TabToSave[] = (Array.isArray(raw.tabs) ? raw.tabs : [])
       .filter(
-        (t): t is TabToSave =>
+        (t): t is { url: string; title?: unknown; group?: unknown } =>
           typeof t?.url === 'string' && isRestorableUrl(t.url),
       )
-      .map((t) => ({
-        url: t.url,
-        title: typeof t.title === 'string' ? t.title : t.url,
-      }))
+      .map((t) => {
+        const group =
+          typeof t.group === 'string' ? groups.get(t.group) : undefined
+        return {
+          url: t.url,
+          title: typeof t.title === 'string' ? t.title : t.url,
+          ...(group && { group: { ...group, key: t.group as string } }),
+        }
+      })
     if (tabs.length === 0) continue
     const session = newSession(tabs, {
       now: typeof raw.createdAt === 'number' ? raw.createdAt : options.now,
@@ -122,7 +128,24 @@ type RawSession = {
   name?: unknown
   createdAt?: unknown
   locked?: unknown
-  tabs?: { url?: unknown; title?: unknown }[]
+  tabs?: { url?: unknown; title?: unknown; group?: unknown }[]
+  groups?: unknown
+}
+
+/** A backup's saved groups by id; anything malformed is left out. */
+function readGroups(raw: unknown): Map<string, GroupInfo> {
+  const groups = new Map<string, GroupInfo>()
+  if (!Array.isArray(raw)) return groups
+  for (const g of raw as Record<string, unknown>[]) {
+    if (typeof g?.id !== 'string') continue
+    const color = groupColors.find((c) => c === g.color) ?? 'grey'
+    groups.set(g.id, {
+      title: typeof g.title === 'string' ? g.title : '',
+      color,
+      collapsed: g.collapsed === true,
+    })
+  }
+  return groups
 }
 
 function isBackup(data: unknown): data is { sessions: RawSession[] } {

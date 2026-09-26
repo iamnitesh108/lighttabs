@@ -3,6 +3,7 @@ import type { RequestType } from '../../shared/messages.ts'
 import { send } from '../../shared/messages.ts'
 import { describeStatus } from '../shared/copy.ts'
 import { byId } from '../shared/dom.ts'
+import { groupColorValues } from '../shared/group-color.ts'
 
 const message = byId('message')
 
@@ -11,8 +12,14 @@ async function main(): Promise<void> {
   if (tab?.id === undefined) return
   const tabId = tab.id
   const windowId = tab.windowId
+  const groupId = tab.groupId
 
-  await Promise.all([showStatus(tabId), showStats(), showShortcuts()])
+  await Promise.all([
+    showStatus(tabId),
+    showStats(),
+    showShortcuts(),
+    showGroup(groupId),
+  ])
 
   // Actions that close tabs (or switch away) close the popup too; the
   // result is visible in the browser itself.
@@ -37,6 +44,16 @@ async function main(): Promise<void> {
       )
       await showStats()
     },
+    'suspend-group': async () => {
+      const { suspended } = await send('suspend-group', { groupId })
+      say(
+        suspended === 0
+          ? 'No other tabs in this group to suspend.'
+          : `Suspended ${plural(suspended, 'tab')}.`,
+      )
+      await showStats()
+    },
+    'save-group': () => send('save-group', { groupId, windowId }).then(close),
     'save-window': () => send('save-window', { windowId }).then(close),
     'save-tab': () => send('save-tab', { tabId }).then(close),
     'save-all-windows': () =>
@@ -104,6 +121,15 @@ async function showStats(): Promise<void> {
     `${stats.suspended} of ${stats.tabs} suspended · ${saved}`
   byId('stats').title =
     `${plural(stats.suspended, 'tab')} suspended, ${plural(stats.savedTabs, 'tab')} in saved lists`
+}
+
+/** Shows the tab group actions when the current tab is in a group. */
+async function showGroup(groupId: number): Promise<void> {
+  if (groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) return
+  const group = await chrome.tabGroups.get(groupId)
+  byId('tab-group').hidden = false
+  if (group.title) byId('tab-group-name').textContent = group.title
+  byId('tab-group-dot').style.background = groupColorValues[group.color]
 }
 
 /** Shows the keyboard shortcuts the user actually has (they can change them). */

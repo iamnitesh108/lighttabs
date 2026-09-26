@@ -4,7 +4,7 @@ import type {
   ActivityRepository,
 } from '../../src/background/ports.ts'
 import { parsePlaceholder } from '../../src/core/placeholder.ts'
-import type { SavedSession } from '../../src/core/sessions.ts'
+import type { GroupInfo, SavedSession } from '../../src/core/sessions.ts'
 import {
   defaultSettings,
   normalizeSettings,
@@ -49,19 +49,51 @@ export class FakeBrowser implements Browser {
       discarded: false,
       placeholder: false,
       suspendedAt: null,
+      groupId: -1,
       autoDiscardable: true,
       ...overrides,
     }
     this.tabs.push(tab)
+    this.reindex()
     return { ...tab } // a copy, like the real API: ids in it may go stale
   }
 
-  async queryTabs(query: { windowId?: number } = {}): Promise<TabInfo[]> {
+  /** Like the browser, tab positions count from 0 in each window. */
+  private reindex(): void {
+    const next = new Map<number, number>()
+    for (const tab of this.tabs) {
+      tab.index = next.get(tab.windowId) ?? 0
+      next.set(tab.windowId, tab.index + 1)
+    }
+  }
+
+  groups = new Map<number, GroupInfo>()
+  private nextGroupId = 1
+
+  async queryTabs(
+    query: { windowId?: number; groupId?: number } = {},
+  ): Promise<TabInfo[]> {
     return this.tabs
       .filter(
-        (t) => query.windowId === undefined || t.windowId === query.windowId,
+        (t) =>
+          (query.windowId === undefined || t.windowId === query.windowId) &&
+          (query.groupId === undefined || t.groupId === query.groupId),
       )
       .map((t) => ({ ...t }))
+  }
+
+  async getGroup(id: number): Promise<GroupInfo | null> {
+    return this.groups.get(id) ?? null
+  }
+
+  async groupTabs(
+    tabIds: number[],
+    _windowId: number,
+    group: GroupInfo,
+  ): Promise<void> {
+    const id = this.nextGroupId++
+    this.groups.set(id, group)
+    for (const tab of this.tabs) if (tabIds.includes(tab.id)) tab.groupId = id
   }
 
   async getTab(id: number): Promise<TabInfo | null> {
@@ -157,6 +189,7 @@ export class FakeBrowser implements Browser {
 
   async removeTabs(ids: number[]): Promise<void> {
     this.tabs = this.tabs.filter((t) => !ids.includes(t.id))
+    this.reindex()
   }
 
   async createWindow(

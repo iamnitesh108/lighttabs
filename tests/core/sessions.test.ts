@@ -3,6 +3,7 @@ import {
   newSession,
   searchSessions,
   sortSessions,
+  tabsWithGroups,
   withoutTab,
 } from '../../src/core/sessions.ts'
 
@@ -64,5 +65,41 @@ describe('lists', () => {
 
   it('search list names too, keeping all of their tabs', () => {
     expect(searchSessions([older, newer], 'reading')[0].tabs).toHaveLength(2)
+  })
+})
+
+describe('tab groups in lists', () => {
+  const work = { title: 'Work', color: 'blue' as const, collapsed: false }
+
+  it('keeps one saved group per browser group, in tab order', () => {
+    let n = 0
+    const session = newSession(
+      [
+        { url: 'https://a.com/', title: 'A', group: { ...work, key: 7 } },
+        { url: 'https://b.com/', title: 'B' },
+        { url: 'https://c.com/', title: 'C', group: { ...work, key: 7 } },
+      ],
+      { now: 1, makeId: () => `id${++n}`, skipDuplicates: false },
+    )
+    expect(session.groups).toEqual([{ id: 'id1', ...work }])
+    expect(
+      tabsWithGroups(session).map(({ tab, group }) => [
+        tab.title,
+        group?.title,
+      ]),
+    ).toEqual([
+      ['A', 'Work'],
+      ['B', undefined],
+      ['C', 'Work'],
+    ])
+  })
+
+  it('drops a group when its last tab is removed', () => {
+    let n = 0
+    const session = newSession(
+      [{ url: 'https://a.com/', title: 'A', group: { ...work, key: 1 } }],
+      { now: 1, makeId: () => `id${++n}`, skipDuplicates: false },
+    )
+    expect(withoutTab(session, session.tabs[0].id).groups).toEqual([])
   })
 })

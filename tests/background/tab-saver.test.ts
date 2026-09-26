@@ -181,3 +181,44 @@ describe('saving unused suspended tabs', () => {
     expect(browser.tabs.map((t) => t.url)).not.toContain('https://old.com/')
   })
 })
+
+describe('tab groups', () => {
+  it('saves a window with its groups and restores them as groups', async () => {
+    const { browser, sessions, saver } = setup({ restoreWithoutLoading: false })
+    browser.groups.set(5, { title: 'Work', color: 'blue', collapsed: false })
+    browser.addTab({ active: true })
+    browser.addTab({ url: 'https://a.com/', groupId: 5 })
+    browser.addTab({ url: 'https://b.com/' })
+    browser.addTab({ url: 'https://c.com/', groupId: 5 })
+    await saver.saveWindow(1)
+    const [list] = await sessions.list()
+    expect(list.groups).toEqual([
+      {
+        id: expect.any(String),
+        title: 'Work',
+        color: 'blue',
+        collapsed: false,
+      },
+    ])
+
+    await saver.restoreSession(list.id, 1, false)
+    const a = browser.byUrl('https://a.com/')
+    expect(a.groupId).not.toBe(-1)
+    expect(browser.byUrl('https://c.com/').groupId).toBe(a.groupId)
+    expect(browser.byUrl('https://b.com/').groupId).toBe(-1)
+    expect(browser.groups.get(a.groupId)).toMatchObject({ title: 'Work' })
+  })
+
+  it('saves one group into a list named after it', async () => {
+    const { browser, sessions, saver } = setup()
+    browser.groups.set(5, { title: 'Trip', color: 'red', collapsed: false })
+    browser.addTab({ active: true })
+    browser.addTab({ url: 'https://a.com/', groupId: 5 })
+    browser.addTab({ url: 'https://b.com/' })
+    expect(await saver.saveGroup(5, 1)).toBe(1)
+    const [list] = await sessions.list()
+    expect(list.name).toBe('Trip')
+    expect(browser.tabs.map((t) => t.url)).toContain('https://b.com/')
+    expect(browser.tabs.map((t) => t.url)).not.toContain('https://a.com/')
+  })
+})

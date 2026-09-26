@@ -1,4 +1,6 @@
 import { parsePlaceholder } from '../core/placeholder.ts'
+import type { GroupInfo } from '../core/sessions.ts'
+import { groupColors } from '../core/sessions.ts'
 import type { TabInfo } from '../core/tab.ts'
 
 /**
@@ -6,7 +8,7 @@ import type { TabInfo } from '../core/tab.ts'
  * code depends on this interface, so tests use a fake instead of chrome.*.
  */
 export interface Browser {
-  queryTabs(query?: { windowId?: number }): Promise<TabInfo[]>
+  queryTabs(query?: { windowId?: number; groupId?: number }): Promise<TabInfo[]>
   getTab(id: number): Promise<TabInfo | null>
   discard(id: number): Promise<boolean>
   /**
@@ -35,6 +37,9 @@ export interface Browser {
     index?: number
   }): Promise<TabInfo>
   removeTabs(ids: number[]): Promise<void>
+  getGroup(id: number): Promise<GroupInfo | null>
+  /** Puts tabs of one window into a new group. */
+  groupTabs(tabIds: number[], windowId: number, group: GroupInfo): Promise<void>
   createWindow(url: string): Promise<{ windowId: number; tabId: number }>
   focusWindow(id: number): Promise<void>
 }
@@ -47,7 +52,9 @@ export class ChromeBrowser implements Browser {
     this.placeholderBase = placeholderBase
   }
 
-  async queryTabs(query: { windowId?: number } = {}): Promise<TabInfo[]> {
+  async queryTabs(
+    query: { windowId?: number; groupId?: number } = {},
+  ): Promise<TabInfo[]> {
     const tabs = await chrome.tabs.query({ ...query, windowType: 'normal' })
     return tabs.flatMap((t) => (t.id === undefined ? [] : [this.toTabInfo(t)]))
   }
@@ -177,6 +184,32 @@ export class ChromeBrowser implements Browser {
     if (ids.length > 0) await chrome.tabs.remove(ids)
   }
 
+  async getGroup(id: number): Promise<GroupInfo | null> {
+    try {
+      const group = await chrome.tabGroups.get(id)
+      return {
+        title: group.title ?? '',
+        color: groupColors.find((c) => c === group.color) ?? 'grey',
+        collapsed: group.collapsed,
+      }
+    } catch {
+      return null // no longer exists
+    }
+  }
+
+  async groupTabs(
+    tabIds: number[],
+    windowId: number,
+    group: GroupInfo,
+  ): Promise<void> {
+    if (tabIds.length === 0) return
+    const groupId = await chrome.tabs.group({
+      tabIds: tabIds as [number, ...number[]],
+      createProperties: { windowId },
+    })
+    await chrome.tabGroups.update(groupId, group)
+  }
+
   async createWindow(
     url: string,
   ): Promise<{ windowId: number; tabId: number }> {
@@ -209,6 +242,7 @@ export class ChromeBrowser implements Browser {
       discarded: tab.discarded,
       placeholder: page !== null,
       suspendedAt: page?.since ?? null,
+      groupId: tab.groupId,
       autoDiscardable: tab.autoDiscardable,
     }
   }

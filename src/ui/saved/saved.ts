@@ -1,11 +1,17 @@
 import { formatSavedAt, plural } from '../../core/format.ts'
-import type { SavedSession, SavedTab } from '../../core/sessions.ts'
-import { countTabs, searchSessions, sortSessions } from '../../core/sessions.ts'
+import type { SavedGroup, SavedSession, SavedTab } from '../../core/sessions.ts'
+import {
+  countTabs,
+  searchSessions,
+  sortSessions,
+  tabsWithGroups,
+} from '../../core/sessions.ts'
 import { exportBackup, exportText } from '../../core/transfer.ts'
 import { SessionStore } from '../../platform/session-store.ts'
 import { send } from '../../shared/messages.ts'
 import { byId, el } from '../shared/dom.ts'
 import { faviconUrl } from '../shared/favicon.ts'
+import { groupColorValues } from '../shared/group-color.ts'
 
 const store = new SessionStore()
 const listsElement = byId('lists')
@@ -81,11 +87,31 @@ function renderSession(session: SavedSession, now: number): HTMLElement {
           : button('delete', 'Delete', { class: 'link-button danger' }),
       ),
     ),
-    el(
-      'ul',
-      { class: 'tabs' },
-      ...session.tabs.map((tab) => renderTab(tab, session.locked)),
-    ),
+    el('ul', { class: 'tabs' }, ...renderTabs(session)),
+  )
+}
+
+/** The tabs, with a label above each run of tabs from one tab group. */
+function renderTabs(session: SavedSession): HTMLElement[] {
+  const items: HTMLElement[] = []
+  let currentGroup: string | undefined
+  for (const { tab, group } of tabsWithGroups(session)) {
+    if (group && group.id !== currentGroup) items.push(renderGroupLabel(group))
+    currentGroup = group?.id
+    items.push(renderTab(tab, session.locked, group))
+  }
+  return items
+}
+
+function renderGroupLabel(group: SavedGroup): HTMLElement {
+  return el(
+    'li',
+    { class: 'group-label' },
+    el('span', {
+      class: 'dot',
+      style: `background: ${groupColorValues[group.color]}`,
+    }),
+    group.title || 'Tab group',
   )
 }
 
@@ -102,7 +128,12 @@ function button(
   )
 }
 
-function renderTab(tab: SavedTab, locked: boolean): HTMLElement {
+/** A saved tab; tabs from a tab group get a bar in the group's colour. */
+function renderTab(
+  tab: SavedTab,
+  locked: boolean,
+  group?: SavedGroup,
+): HTMLElement {
   let host = ''
   try {
     host = new URL(tab.url).host
@@ -111,7 +142,11 @@ function renderTab(tab: SavedTab, locked: boolean): HTMLElement {
   }
   return el(
     'li',
-    { class: 'tab', 'data-tab': tab.id },
+    {
+      class: group ? 'tab in-group' : 'tab',
+      'data-tab': tab.id,
+      style: group && `--group-color: ${groupColorValues[group.color]}`,
+    },
     el(
       'a',
       {

@@ -30,7 +30,8 @@
     "unlimitedStorage",
     "alarms",
     "favicon",
-    "contextMenus"
+    "contextMenus",
+    "tabGroups"
   ],
   "commands": {
     "_execute_action": {

@@ -72,6 +72,9 @@ const handlers: Handlers = {
   'suspend-others': async ({ windowId }) => ({
     suspended: await suspender.suspendOthers(windowId),
   }),
+  'suspend-group': async ({ groupId }) => ({
+    suspended: await suspender.suspendGroup(groupId),
+  }),
   'unsuspend-tab': async ({ tabId }) => (
     await suspender.unsuspendTab(tabId),
     null
@@ -91,6 +94,9 @@ const handlers: Handlers = {
   'save-tab': async ({ tabId }) => ({ saved: await saver.saveTab(tabId) }),
   'save-window': async ({ windowId }) => ({
     saved: await saver.saveWindow(windowId),
+  }),
+  'save-group': async ({ groupId, windowId }) => ({
+    saved: await saver.saveGroup(groupId, windowId),
   }),
   'save-all-windows': async ({ windowId }) => ({
     saved: await saver.saveAllWindows(windowId),

@@ -1,7 +1,7 @@
 import { unusedSuspendedTabs } from '../core/auto-save.ts'
 import { plural } from '../core/format.ts'
-import type { SavedSession, TabToSave } from '../core/sessions.ts'
-import { newSession, withoutTab } from '../core/sessions.ts'
+import type { GroupInfo, SavedSession, TabToSave } from '../core/sessions.ts'
+import { newSession, tabsWithGroups, withoutTab } from '../core/sessions.ts'
 import type { TabInfo } from '../core/tab.ts'
 import { parseImport } from '../core/transfer.ts'
 import { isSaveableUrl } from '../core/urls.ts'
@@ -48,10 +48,22 @@ export class TabSaver {
     return this.saveAndClose([tab], tab.windowId, { includePinned: true })
   }
 
+  /** Saves a tab group into a list named after it, and closes its tabs. */
+  async saveGroup(groupId: number, windowId: number): Promise<number> {
+    const { browser } = this.deps
+    const group = await browser.getGroup(groupId)
+    if (!group) throw new UserError('That tab group no longer exists.')
+    const tabs = await browser.queryTabs({ groupId })
+    return this.saveAndClose(tabs, windowId, {
+      includePinned: true,
+      name: group.title,
+    })
+  }
+
   private async saveAndClose(
     tabs: readonly TabInfo[],
     windowId: number,
-    options: { includePinned?: boolean } = {},
+    options: { includePinned?: boolean; name?: string } = {},
   ): Promise<number> {
     const { browser, sessions, pages, now, makeId } = this.deps
     const settings = await this.deps.settings.get()
@@ -65,10 +77,11 @@ export class TabSaver {
     if (toSave.length === 0)
       throw new UserError('There are no tabs to save here.')
 
-    const session = newSession(toSave.map(toTabToSave), {
+    const session = newSession(await this.withGroups(toSave), {
       now: now(),
       makeId,
       skipDuplicates: settings.skipDuplicatesWhenSaving,
+      name: options.name,
     })
     await sessions.add([session])
 
@@ -105,7 +118,7 @@ export class TabSaver {
     if (unused.length === 0) return 0
 
     const days = settings.saveSuspendedAfterDays
-    const session = newSession(unused.map(toTabToSave), {
+    const session = newSession(await this.withGroups(unused), {
       now: now(),
       makeId,
       skipDuplicates: settings.skipDuplicatesWhenSaving,
@@ -139,6 +152,7 @@ export class TabSaver {
       target = (await browser.createWindow(first.url)).windowId
       rest = others
     }
+    const restoredCount = session.tabs.length
     const asPlaceholders =
       settings.restoreWithoutLoading && settings.clickToLoad
     const created: number[] = []
@@ -152,6 +166,8 @@ export class TabSaver {
       })
       created.push(opened.id)
     }
+    // Grouped before discarding: discarding can give a tab a new id.
+    await this.regroup(session, target, restoredCount)
     // Discarded in parallel, so one slow site doesn't hold up the rest.
     if (settings.restoreWithoutLoading && !asPlaceholders) {
       await Promise.all(created.map((id) => browser.discardWhenCommitted(id)))
@@ -205,6 +221,52 @@ export class TabSaver {
     await this.deps.sessions.update(sessionId, (s) => ({ ...s, locked }))
   }
 
+  /** The tabs as they'll be saved, with the name and colour of their group. */
+  private async withGroups(tabs: readonly TabInfo[]): Promise<TabToSave[]> {
+    const ids = [...new Set(tabs.map((t) => t.groupId))].filter((id) => id >= 0)
+    const found = new Map<number, GroupInfo | null>()
+    for (const id of ids) found.set(id, await this.deps.browser.getGroup(id))
+    return tabs.map((tab) => {
+      const group = found.get(tab.groupId)
+      return {
+        url: tab.url,
+        title: tab.title,
+        ...(group && { group: { ...group, key: tab.groupId } }),
+      }
+    })
+  }
+
+  /**
+   * Puts restored tabs back into their groups. The restored tabs are the
+   * last ones of the window, in list order; they're looked up again right
+   * before grouping, because a restored tab's id can change when it's
+   * discarded.
+   */
+  private async regroup(
+    session: SavedSession,
+    windowId: number,
+    count: number,
+  ): Promise<void> {
+    if (!session.groups?.length) return
+    const { browser } = this.deps
+    const restored = (await browser.queryTabs({ windowId }))
+      .toSorted((a, b) => a.index - b.index)
+      .slice(-count)
+    const entries = tabsWithGroups(session)
+    for (const group of session.groups) {
+      const ids = entries.flatMap(({ group: g }, i) =>
+        g?.id === group.id && restored[i] ? [restored[i].id] : [],
+      )
+      const { title, color, collapsed } = group
+      try {
+        await browser.groupTabs(ids, windowId, { title, color, collapsed })
+      } catch (error) {
+        // A tab closed or changed meanwhile: the tabs stay, just ungrouped.
+        console.warn('LightTabs: could not regroup tabs', error)
+      }
+    }
+  }
+
   /** Adds the lists from a LightTabs backup or a OneTab export. */
   async import(text: string): Promise<{ lists: number; tabs: number }> {
     let imported: SavedSession[]
@@ -224,8 +286,4 @@ export class TabSaver {
       tabs: imported.reduce((n, s) => n + s.tabs.length, 0),
     }
   }
-}
-
-function toTabToSave(tab: TabInfo): TabToSave {
-  return { url: tab.url, title: tab.title }
 }

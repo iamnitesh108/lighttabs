@@ -107,9 +107,17 @@ export class Suspender {
 
   /** Suspends the other tabs of a window, respecting the user's exceptions (but not the timer). */
   async suspendOthers(windowId: number): Promise<number> {
-    const { browser, activity, isOnline } = this.deps
+    return this.suspendOthersOf(await this.deps.browser.queryTabs({ windowId }))
+  }
+
+  /** The same, for the tabs of one tab group. */
+  async suspendGroup(groupId: number): Promise<number> {
+    return this.suspendOthersOf(await this.deps.browser.queryTabs({ groupId }))
+  }
+
+  private async suspendOthersOf(tabs: readonly TabInfo[]): Promise<number> {
+    const { activity, isOnline } = this.deps
     const settings = await this.deps.settings.get()
-    const tabs = await browser.queryTabs({ windowId })
     const snapshot = await activity.snapshot(tabs)
 
     const online = isOnline()

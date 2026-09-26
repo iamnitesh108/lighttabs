@@ -286,3 +286,16 @@ describe('click to load', () => {
     expect(await suspender.prepareForUpdate()).toBe(false)
   })
 })
+
+describe('tab groups', () => {
+  it('suspends only the other tabs of the group', async () => {
+    const { browser, suspender } = setup()
+    const current = browser.addTab({ active: true, groupId: 5 })
+    const inGroup = browser.addTab({ groupId: 5 })
+    const outside = browser.addTab()
+    expect(await suspender.suspendGroup(5)).toBe(1)
+    expect(browser.byUrl(inGroup.url).discarded).toBe(true)
+    expect(browser.byUrl(outside.url).discarded).toBe(false)
+    expect(browser.byUrl(current.url).discarded).toBe(false)
+  })
+})

@@ -18,6 +18,8 @@ export type TabInfo = {
   placeholder: boolean
   /** When the suspended-tab page was shown, if the tab has one that says. */
   suspendedAt: number | null
+  /** The tab group it's in, or -1 for none. */
+  groupId: number
   /** False when the user or another extension has marked the tab "keep loaded". */
   autoDiscardable: boolean
 }

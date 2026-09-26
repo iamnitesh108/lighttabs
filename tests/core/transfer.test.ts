@@ -72,3 +72,35 @@ describe('LightTabs backup', () => {
     )
   })
 })
+
+describe('backups with tab groups', () => {
+  it('keep the groups through export and import', () => {
+    let n = 0
+    const makeId = () => `id${++n}`
+    const session = newSession(
+      [
+        {
+          url: 'https://a.com/',
+          title: 'A',
+          group: { key: 3, title: 'Read', color: 'green', collapsed: true },
+        },
+        { url: 'https://b.com/', title: 'B' },
+      ],
+      { now: 1, makeId, skipDuplicates: false },
+    )
+    const [imported] = parseImport(exportBackup([session], 2), {
+      now: 3,
+      makeId,
+    })
+    expect(imported.groups).toEqual([
+      {
+        id: expect.any(String),
+        title: 'Read',
+        color: 'green',
+        collapsed: true,
+      },
+    ])
+    expect(imported.tabs[0].group).toBe(imported.groups![0].id)
+    expect(imported.tabs[1].group).toBeUndefined()
+  })
+})
