@@ -1,0 +1,57 @@
+html,
+body {
+  height: 100%;
+}
+
+/* The whole page is one button: a click anywhere (or Enter) loads the site. */
+.load {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: 100%;
+  padding: var(--space-6);
+  border: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.load:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -6px;
+}
+
+.site-icon {
+  width: 32px;
+  height: 32px;
+  margin-bottom: var(--space-2);
+}
+
+.title {
+  max-width: min(640px, 100%);
+  font-size: 20px;
+  font-weight: 600;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.address {
+  max-width: min(640px, 100%);
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hint {
+  margin-top: var(--space-4);
+  color: var(--text-muted);
+}
+
+.load:hover .hint {
+  color: var(--text);
+}

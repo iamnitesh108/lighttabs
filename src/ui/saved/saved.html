@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Saved tabs · LightTabs</title>
+    <link rel="stylesheet" href="../shared/base.css" />
+    <link rel="stylesheet" href="./saved.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div>
+          <h1 class="title">Saved tabs</h1>
+          <p id="summary" class="muted"></p>
+        </div>
+        <div class="tools">
+          <label class="visually-hidden" for="search">Search saved tabs</label>
+          <input
+            id="search"
+            class="search"
+            type="search"
+            placeholder="Search"
+            autocomplete="off"
+          />
+          <button id="import" class="button" type="button">Import</button>
+          <button id="export" class="button" type="button">Export</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+      <p id="message" class="message" role="status"></p>
+      <div id="lists"></div>
+      <div id="empty" class="empty" hidden>
+        <p class="empty-title">No saved tabs yet</p>
+        <p class="muted">
+          Open LightTabs from the toolbar and choose
+          <strong>Save this window</strong>, or press
+          <kbd id="save-shortcut">Alt+Shift+W</kbd>. The tabs are closed and
+          kept here until you need them.
+        </p>
+      </div>
+    </main>
+
+    <dialog id="export-dialog" class="dialog">
+      <form method="dialog">
+        <h2 class="dialog-title">Export saved tabs</h2>
+        <p class="muted">
+          A backup keeps everything and can be imported again. Plain text works
+          with OneTab and other tools.
+        </p>
+        <div class="dialog-actions">
+          <button class="button" value="backup">Backup (.json)</button>
+          <button class="button" value="text">Plain text (.txt)</button>
+          <button class="button" value="cancel">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
+    <input
+      id="import-file"
+      type="file"
+      accept=".json,.txt,text/plain,application/json"
+      hidden
+    />
+    <script type="module" src="./saved.ts"></script>
+  </body>
+</html>

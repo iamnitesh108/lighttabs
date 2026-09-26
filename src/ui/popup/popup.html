@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>LightTabs</title>
+    <link rel="stylesheet" href="../shared/base.css" />
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <header class="header">
+      <h1 class="brand">LightTabs</h1>
+      <button
+        id="open-options"
+        class="icon-button"
+        type="button"
+        title="Settings"
+        aria-label="Settings"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M6.9 1h2.2l.4 1.9 1 .4 1.6-1.1 1.6 1.6-1.1 1.6.4 1 1.9.4v2.2l-1.9.4-.4 1 1.1 1.6-1.6 1.6-1.6-1.1-1 .4-.4 1.9H6.9l-.4-1.9-1-.4-1.6 1.1-1.6-1.6 1.1-1.6-.4-1L1 9.1V6.9l1.9-.4.4-1-1.1-1.6 1.6-1.6 1.6 1.1 1-.4zM8 5.6a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8"
+          />
+        </svg>
+      </button>
+    </header>
+
+    <section class="current" aria-label="Current tab">
+      <p id="tab-title" class="tab-title"></p>
+      <p id="tab-status" class="muted"></p>
+    </section>
+
+    <p id="message" class="message" role="status"></p>
+
+    <nav class="actions" aria-label="Actions">
+      <h2 class="group-title">Suspend</h2>
+      <button
+        id="toggle-tab"
+        class="action"
+        type="button"
+        data-action="suspend-tab"
+      >
+        <span id="toggle-tab-label">Suspend this tab</span
+        ><kbd data-command="suspend-tab"></kbd>
+      </button>
+      <button class="action" type="button" data-action="suspend-others">
+        <span>Suspend other tabs</span><kbd data-command="suspend-others"></kbd>
+      </button>
+      <button class="action" type="button" data-action="unsuspend-all">
+        <span>Unsuspend all tabs</span>
+      </button>
+
+      <h2 class="group-title">Save and close</h2>
+      <button class="action" type="button" data-action="save-window">
+        <span>Save this window</span><kbd data-command="save-window"></kbd>
+      </button>
+      <button class="action" type="button" data-action="save-tab">
+        <span>Save this tab</span>
+      </button>
+      <button class="action" type="button" data-action="save-all-windows">
+        <span>Save all windows</span>
+      </button>
+
+      <h2 class="group-title">Keep loaded</h2>
+      <label class="toggle">
+        <input id="toggle-site" type="checkbox" />
+        <span id="toggle-site-label">Never suspend this site</span>
+      </label>
+      <label class="toggle">
+        <input id="toggle-pause" type="checkbox" />
+        <span>Don't suspend this tab for now</span>
+      </label>
+    </nav>
+
+    <footer class="footer">
+      <p id="stats" class="muted"></p>
+      <button id="open-saved" class="button" type="button">Saved tabs</button>
+    </footer>
+
+    <script type="module" src="./popup.ts"></script>
+  </body>
+</html>

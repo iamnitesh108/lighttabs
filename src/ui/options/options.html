@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Settings · LightTabs</title>
+    <link rel="stylesheet" href="../shared/base.css" />
+    <link rel="stylesheet" href="./options.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="page-header">
+        <h1>LightTabs settings</h1>
+        <p id="saved-note" class="muted" role="status"></p>
+      </header>
+
+      <section class="card" aria-labelledby="suspend-title">
+        <h2 id="suspend-title">Suspending</h2>
+        <p class="muted">
+          A suspended tab stays in your tab bar but frees its memory.
+        </p>
+        <label class="field">
+          <span>Suspend tabs left in the background for</span>
+          <select id="suspendAfterMinutes"></select>
+        </label>
+        <label class="check">
+          <input type="checkbox" data-setting="clickToLoad" /> Load a suspended
+          tab only when I click the page
+          <span class="muted"
+            >(its icon is faded. When off, a tab loads as soon as you open it,
+            and suspended tabs keep working even if LightTabs is removed)</span
+          >
+        </label>
+        <label class="check"
+          ><input type="checkbox" data-setting="keepPinned" /> Keep pinned tabs
+          loaded</label
+        >
+        <label class="check"
+          ><input type="checkbox" data-setting="keepAudible" /> Keep tabs
+          playing audio loaded</label
+        >
+        <label class="check">
+          <input type="checkbox" data-setting="keepWhenOffline" /> Don't suspend
+          while offline
+          <span class="muted"
+            >(a suspended tab can't reload without a connection)</span
+          >
+        </label>
+      </section>
+
+      <section class="card" aria-labelledby="sites-title">
+        <h2 id="sites-title">Never suspend these sites</h2>
+        <label class="field">
+          <span class="muted"
+            >One site per line. A site covers its subdomains:
+            <code>google.com</code> also covers
+            <code>mail.google.com</code>.</span
+          >
+          <textarea
+            id="neverSuspendSites"
+            rows="5"
+            spellcheck="false"
+            placeholder="music.youtube.com"
+          ></textarea>
+        </label>
+      </section>
+
+      <section class="card" aria-labelledby="saving-title">
+        <h2 id="saving-title">Saving and restoring</h2>
+        <label class="check"
+          ><input type="checkbox" data-setting="keepPinnedWhenSaving" /> Leave
+          pinned tabs open when saving a window</label
+        >
+        <label class="check"
+          ><input type="checkbox" data-setting="skipDuplicatesWhenSaving" />
+          Skip duplicate tabs when saving</label
+        >
+        <label class="check"
+          ><input type="checkbox" data-setting="openSavedPageAfterSaving" />
+          Show the saved tabs page after saving</label
+        >
+        <label class="check">
+          <input type="checkbox" data-setting="restoreWithoutLoading" /> Restore
+          tabs without loading them
+          <span class="muted"
+            >(each tab loads when you open it, so restoring many tabs stays
+            light)</span
+          >
+        </label>
+        <label class="check"
+          ><input type="checkbox" data-setting="keepListsAfterRestoring" /> Keep
+          lists after restoring them</label
+        >
+      </section>
+
+      <section class="card" aria-labelledby="keys-title">
+        <h2 id="keys-title">Keyboard shortcuts</h2>
+        <dl id="shortcuts" class="shortcuts"></dl>
+        <button id="change-shortcuts" class="button" type="button">
+          Change shortcuts
+        </button>
+      </section>
+
+      <p id="version" class="muted footer"></p>
+    </main>
+    <script type="module" src="./options.ts"></script>
+  </body>
+</html>
