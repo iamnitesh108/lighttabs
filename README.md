@@ -79,17 +79,6 @@ npm run build
 
 Then open `brave://extensions` (or `chrome://extensions`), turn on **Developer mode**, click **Load unpacked**, and pick the `dist` folder.
 
-## Keyboard shortcuts
-
-| Shortcut    | Action                                 |
-| ----------- | -------------------------------------- |
-| Alt+Shift+L | Open LightTabs                         |
-| Alt+Shift+S | Suspend the current tab                |
-| Alt+Shift+O | Suspend other tabs in this window      |
-| Alt+Shift+K | Save this window's tabs and close them |
-
-Change them at `brave://extensions/shortcuts` (or the settings page's **Change shortcuts** button). A shortcut can show as unassigned if another extension already uses it.
-
 ## Permissions
 
 | Permission                      | Why                                                                                                                                   |
