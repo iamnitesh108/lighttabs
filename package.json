@@ -1,7 +1,7 @@
 {
   "name": "lighttabs",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Free memory by suspending idle tabs, and save tab lists for later.",
   "type": "module",
   "scripts": {
