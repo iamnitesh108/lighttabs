@@ -114,6 +114,7 @@ const handlers: Handlers = {
   'save-all-windows': async ({ windowId }) => ({
     saved: await saver.saveAllWindows(windowId),
   }),
+  'close-tab': async ({ tabId }) => (await browser.removeTabs([tabId]), null),
   'open-saved': async ({ windowId }) => (await pages.showSaved(windowId), null),
   'open-overview': async ({ windowId }) => (
     await pages.showOverview(windowId),

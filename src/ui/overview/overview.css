@@ -82,18 +82,12 @@
 
 .card {
   display: grid;
-  grid-template-columns: 24px 1fr;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  gap: var(--space-3);
   min-width: 0;
-  padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
 .card:hover {
@@ -101,13 +95,52 @@
   background: var(--surface-hover);
 }
 
-.card:focus-visible {
+.card-open {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.card-open:focus-visible,
+.close:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
 
+.close {
+  width: 28px;
+  height: 28px;
+  margin-right: var(--space-2);
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+/* Shown on the card under the mouse or keyboard, like the tab bar. */
+.card:not(:hover, :focus-within) .close {
+  visibility: hidden;
+}
+
 /* The tab in front of its window. */
-.card[aria-current='true'] {
+.card:has([aria-current='true']) {
   border-color: var(--accent);
 }
 

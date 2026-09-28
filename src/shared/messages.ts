@@ -52,6 +52,7 @@ export type Requests = {
     request: { windowId: number }
     reply: { saved: number }
   }
+  'close-tab': { request: { tabId: number }; reply: null }
   'open-saved': { request: { windowId?: number }; reply: null }
   'open-overview': { request: { windowId?: number }; reply: null }
   'restore-session': {

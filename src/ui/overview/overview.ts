@@ -7,6 +7,7 @@ import type { TabInfo } from '../../core/tab.ts'
 import { isSuspended } from '../../core/tab.ts'
 import { matchRanges, searchScore, searchWords } from '../../core/tab-search.ts'
 import { ChromeBrowser } from '../../platform/browser.ts'
+import { send } from '../../shared/messages.ts'
 import { byId, el } from '../shared/dom.ts'
 import { faviconUrl } from '../shared/favicon.ts'
 import { groupColorValues } from '../shared/group-color.ts'
@@ -134,47 +135,65 @@ function renderCard(
     isSuspended(tab) && 'suspended',
     isSelected && 'selected',
   ]
+  // Two buttons side by side: a button can't hold another one.
   return el(
-    'button',
+    'div',
     {
       class: classes.filter(Boolean).join(' '),
-      type: 'button',
       'data-tab': tab.id,
       'data-window': tab.windowId,
       'data-index': tab.index,
-      'aria-current': tab.active ? 'true' : undefined,
-      title: tab.url,
+      'data-url': tab.url,
     },
-    el('img', {
-      class: 'favicon',
-      src: faviconUrl(tab.url, 32),
-      alt: '',
-      width: 24,
-      height: 24,
-      loading: 'lazy',
-      decoding: 'async',
-    }),
     el(
-      'span',
-      { class: 'card-text' },
-      el('span', { class: 'card-title' }, ...highlighted(title, words)),
+      'button',
+      {
+        class: 'card-open',
+        type: 'button',
+        'aria-current': tab.active ? 'true' : undefined,
+        title: tab.url,
+      },
+      el('img', {
+        class: 'favicon',
+        src: faviconUrl(tab.url, 32),
+        alt: '',
+        width: 24,
+        height: 24,
+        loading: 'lazy',
+        decoding: 'async',
+      }),
       el(
         'span',
-        { class: 'card-host' },
-        // While searching, the group a result is in isn't visible otherwise.
-        words.length > 0 &&
-          group &&
-          el(
-            'span',
-            {
-              class: 'card-group',
-              style: `--group-color: ${groupColorValues[group.color]}`,
-            },
-            el('span', { class: 'dot' }),
-            group.title || 'Tab group',
-          ),
-        details.join(' · '),
+        { class: 'card-text' },
+        el('span', { class: 'card-title' }, ...highlighted(title, words)),
+        el(
+          'span',
+          { class: 'card-host' },
+          // While searching, the group a result is in isn't visible otherwise.
+          words.length > 0 &&
+            group &&
+            el(
+              'span',
+              {
+                class: 'card-group',
+                style: `--group-color: ${groupColorValues[group.color]}`,
+              },
+              el('span', { class: 'dot' }),
+              group.title || 'Tab group',
+            ),
+          details.join(' · '),
+        ),
       ),
+    ),
+    el(
+      'button',
+      {
+        class: 'close',
+        type: 'button',
+        'aria-label': `Close ${title}`,
+        title: 'Close tab',
+      },
+      '×',
     ),
   )
 }
@@ -244,9 +263,37 @@ async function openTab(
   await browser.focusWindow(windowId)
 }
 
+/**
+ * Closes a tab, like its × in the tab bar. The card goes at once; the page
+ * redraws when the browser reports the tab closed. If the tab got a new id
+ * (it was suspended), the tab at the same place with the same address is
+ * closed instead, and nothing if there's none: never a different tab.
+ */
+async function closeTab(card: HTMLElement): Promise<void> {
+  const { tab, window: windowId, index, url } = card.dataset
+  card.remove()
+  tabs = tabs.filter((t) => t.id !== Number(tab))
+  showSearch() // keeps the search results and their selection in step
+  try {
+    await send('close-tab', { tabId: Number(tab) })
+  } catch {
+    await refresh()
+    const moved = tabs.find(
+      (t) =>
+        t.windowId === Number(windowId) &&
+        t.index === Number(index) &&
+        t.url === url,
+    )
+    if (moved) await send('close-tab', { tabId: moved.id })
+  }
+}
+
 document.addEventListener('click', (event) => {
-  const card = (event.target as Element).closest<HTMLElement>('.card')
-  if (card)
+  const target = event.target as Element
+  const card = target.closest<HTMLElement>('.card')
+  if (!card) return
+  if (target.closest('.close')) void closeTab(card)
+  else if (target.closest('.card-open'))
     void openTab(
       Number(card.dataset.tab),
       Number(card.dataset.window),
