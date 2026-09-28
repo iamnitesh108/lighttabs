@@ -119,38 +119,3 @@ export function isArranged(
       .join()
   return ids(arrangement) !== ids(noArrangement)
 }
-
-/**
- * Drops moved into a cell of a run of cards shown `columns` wide (a run
- * starts on a new row: at the top of a window, or below a group). moved ends
- * up exactly in that cell and the card that was there right below it; every
- * other card keeps its order, closing up the place moved left. Past the end
- * of the run (no such cell), they go last.
- */
-export function dropInCell<T>(
-  run: readonly T[],
-  moved: T,
-  cell: number,
-  columns: number,
-): T[] {
-  const lower = run[cell] === moved ? undefined : run[cell]
-  const rest = run.filter((item) => item !== moved && item !== lower)
-  const result: (T | undefined)[] = Array.from({
-    length: rest.length + (lower === undefined ? 1 : 2),
-  })
-  const last = result.length - 1
-  if (lower === undefined) {
-    result[Math.min(cell, last)] = moved
-  } else {
-    const lowerAt = Math.min(cell + columns, last)
-    result[lowerAt] = lower
-    result[Math.min(cell, lowerAt - 1)] = moved
-  }
-  let next = 0
-  return result.map((item) => item ?? rest[next++])
-}
-
-/** The list with two items trading places. */
-export function swapped<T>(list: readonly T[], a: T, b: T): T[] {
-  return list.map((item) => (item === a ? b : item === b ? a : item))
-}

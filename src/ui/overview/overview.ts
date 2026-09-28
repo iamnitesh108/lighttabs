@@ -2,11 +2,9 @@ import { plural } from '../../core/format.ts'
 import type { Arrangement, OverviewItem } from '../../core/overview.ts'
 import {
   arrangementKey,
-  dropInCell,
   isArranged,
   noArrangement,
   overviewOf,
-  swapped,
   tabsOf,
 } from '../../core/overview.ts'
 import { placeholderPath } from '../../core/placeholder.ts'
@@ -326,37 +324,20 @@ document.addEventListener('click', (event) => {
     )
 })
 
-// Arranging by hand. Everything moves among its siblings only: an
-// ungrouped card or a whole group (by its title) within its window's grid,
-// a group's card within its group. A line shows where it will land, and
-// it moves when let go: moving it during the drag would shift the grid under
-// the pointer (a group is a whole row) and make it jump back and forth.
-// The tab bar itself doesn't change.
-//
-// Near a card's left or right side, a card goes beside it. Near its top or
-// bottom, it goes into that column: into the cell below the gap, with the
-// card that was there right below it (see dropInCell).
-
-/** Where the dragged one lands if let go now. */
-type DropAt =
-  | { kind: 'beside'; next: HTMLElement; after: boolean }
-  | { kind: 'column'; upper: HTMLElement | null; lower: HTMLElement | null }
+// Arranging by hand, like icons on a phone's home screen: the dragged one
+// takes the place of whatever the pointer moves onto, and the rest move
+// out of the way at once, so what you see is where it lands. Everything
+// moves among its siblings only: an ungrouped card or a whole group (by its
+// title) within its window's grid, a group's card within its group. The
+// tab bar itself doesn't change.
 
 let dragged: HTMLElement | null = null
-let dropAt: DropAt | null = null
-
-const dropClasses = ['drop-before', 'drop-after', 'drop-above', 'drop-below']
-
-/** Moves the line showing where the dragged one lands. */
-function showDropAt(next: DropAt | null): void {
-  for (const e of document.querySelectorAll(`.${dropClasses.join(', .')}`))
-    e.classList.remove(...dropClasses)
-  dropAt = next
-  if (next?.kind === 'beside')
-    next.next.classList.add(next.after ? 'drop-after' : 'drop-before')
-  else if (next?.lower) next.lower.classList.add('drop-above')
-  else next?.upper?.classList.add('drop-below')
-}
+/**
+ * What the last move was made over. Moving shifts the grid under a still
+ * pointer (a group is a whole row); acting on the same thing again would
+ * move it back and forth.
+ */
+let movedOver: Element | null = null
 
 /** What is moved from this point: a group by its title, else a card. */
 function movableAt(target: Element): HTMLElement | null {
@@ -373,25 +354,12 @@ function childHolding(container: Element, target: Element): HTMLElement | null {
   return node as HTMLElement | null
 }
 
-/**
- * The child nearest to a point: in the gaps between cards (where you aim
- * to drop between two of them) the pointer is over none of them.
- */
-function nearestChild(
-  container: Element,
-  x: number,
-  y: number,
-): HTMLElement | null {
-  let nearest: HTMLElement | null = null
-  let best = Infinity
-  for (const child of container.children as HTMLCollectionOf<HTMLElement>) {
-    const box = child.getBoundingClientRect()
-    const dx = Math.max(box.left - x, 0, x - box.right)
-    const dy = Math.max(box.top - y, 0, y - box.bottom)
-    const distance = dx * dx + dy * dy
-    if (distance < best) [nearest, best] = [child, distance]
-  }
-  return nearest
+/** Puts moved where other is now; other and the ones between shift by one. */
+function takePlace(moved: HTMLElement, other: Element): void {
+  const after =
+    moved.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING
+  if (after) other.after(moved)
+  else other.before(moved)
 }
 
 const isCard = (e: Element | null): e is HTMLElement =>
@@ -412,53 +380,6 @@ function cardInColumn(card: HTMLElement, step: -1 | 1): HTMLElement | null {
   return null
 }
 
-/** The run of cards a card is in: between groups, or the ends of the grid. */
-function runOf(card: HTMLElement): HTMLElement[] {
-  let first = card
-  while (isCard(first.previousElementSibling))
-    first = first.previousElementSibling
-  const run = [first]
-  for (
-    let next = first.nextElementSibling;
-    isCard(next);
-    next = next.nextElementSibling
-  )
-    run.push(next)
-  return run
-}
-
-/** How many columns a grid of cards shows now (it depends on the width). */
-function columnsOf(grid: Element): number {
-  return getComputedStyle(grid).gridTemplateColumns.split(' ').length
-}
-
-/**
- * Moves a card into the cell of another card of a run, or the cell below
- * it; the card in that cell goes right below (see dropInCell).
- */
-function moveToCell(
-  moved: HTMLElement,
-  card: HTMLElement,
-  rowsDown: 0 | 1,
-): void {
-  const grid = card.parentElement
-  if (!grid) return
-  const run = runOf(card)
-  const columns = columnsOf(grid)
-  const placed = dropInCell(
-    run,
-    moved,
-    run.indexOf(card) + rowsDown * columns,
-    columns,
-  )
-  // The grid's order with the run replaced, wherever moved came from.
-  const stay = run.filter((c) => c !== moved)
-  const order = ([...grid.children] as HTMLElement[]).filter((c) => c !== moved)
-  if (stay.length === 0) return
-  order.splice(order.indexOf(stay[0]), stay.length, ...placed)
-  grid.append(...order)
-}
-
 /** Saves the new order of the moved one and its siblings, then redraws. */
 async function saveOrder(moved: HTMLElement): Promise<void> {
   const container = moved.parentElement
@@ -475,102 +396,67 @@ async function saveOrder(moved: HTMLElement): Promise<void> {
   await refresh()
 }
 
-/** Where a drop at this point of over would land. */
-function dropPoint(
-  moved: HTMLElement,
-  over: HTMLElement,
-  event: DragEvent,
-): DropAt | null {
-  const box = over.getBoundingClientRect()
-  const x = (event.clientX - box.left) / box.width - 0.5
-  const y = (event.clientY - box.top) / box.height - 0.5
-  // A group fills its row: land above or below it.
-  if (over.classList.contains('group'))
-    return { kind: 'beside', next: over, after: y > 0 }
-  // Closer to the left or right side than to the top or bottom: beside it.
-  if (Math.abs(x) >= Math.abs(y))
-    return { kind: 'beside', next: over, after: x > 0 }
-  const upper = y < 0 ? cardInColumn(over, -1) : over
-  const lower = y < 0 ? over : cardInColumn(over, 1)
-  if (lower === moved) return null // its own cell
-  return { kind: 'column', upper, lower }
-}
-
 windowsElement.addEventListener('dragstart', (event) => {
   dragged = movableAt(event.target as Element)
+  movedOver = null
   if (!dragged || !event.dataTransfer) return
   event.dataTransfer.effectAllowed = 'move'
   dragged.classList.add('dragging')
 })
 
-windowsElement.addEventListener('dragover', (event) => {
-  const container = dragged?.parentElement
+// Listened on the whole page: moving a card can shrink the grid from under
+// the pointer, and a drop there must keep what's shown, not undo it.
+document.addEventListener('dragover', (event) => {
+  if (!dragged) return
+  event.preventDefault() // allows the drop anywhere on the page
+  const container = dragged.parentElement
   const target = event.target as Element
-  if (!dragged || !container?.contains(target)) return
-  event.preventDefault() // allows the drop here
-  const over =
-    childHolding(container, target) ??
-    nearestChild(container, event.clientX, event.clientY)
-  const next = over && over !== dragged ? dropPoint(dragged, over, event) : null
-  if (!sameDropAt(next, dropAt)) showDropAt(next)
+  if (!container?.contains(target)) return
+  const over = childHolding(container, target)
+  if (!over || over === movedOver) return
+  movedOver = over
+  if (over !== dragged) takePlace(dragged, over)
 })
 
-function sameDropAt(a: DropAt | null, b: DropAt | null): boolean {
-  if (a?.kind === 'beside' && b?.kind === 'beside')
-    return a.next === b.next && a.after === b.after
-  if (a?.kind === 'column' && b?.kind === 'column')
-    return a.upper === b.upper && a.lower === b.lower
-  return a === b
-}
+document.addEventListener('drop', (event) => {
+  if (dragged) event.preventDefault()
+})
 
-windowsElement.addEventListener('drop', (event) => event.preventDefault())
-
-// Moved when the drag ends, not on drop: the drop event doesn't always
+// Saved when the drag ends, not on drop: the drop event doesn't always
 // arrive, but the drag always ends, saying whether the drop was accepted.
 windowsElement.addEventListener('dragend', (event) => {
   const moved = dragged
-  const at = dropAt
   dragged = null
-  showDropAt(null)
   moved?.classList.remove('dragging')
-  if (!moved || !at || event.dataTransfer?.dropEffect === 'none') return
-  if (at.kind === 'beside') {
-    if (at.after) at.next.after(moved)
-    else at.next.before(moved)
-  } else if (at.lower) {
-    moveToCell(moved, at.lower, 0)
-  } else if (at.upper) {
-    moveToCell(moved, at.upper, 1) // no card below the gap: its empty cell
-  }
-  void saveOrder(moved)
+  if (!moved) return
+  // Cancelled with Escape, or dropped outside the page: put it back.
+  if (event.dataTransfer?.dropEffect === 'none') void refresh()
+  else void saveOrder(moved)
 })
 
-// The same with the keyboard, one place at a time: Alt+Left or Alt+Right
-// on a card moves it along, Alt+Up or Alt+Down swaps it with the card above
-// or below; Alt+Up or Alt+Down on a group's title moves the group.
+// The same with the keyboard: Alt+Left or Alt+Right moves a card one place,
+// Alt+Up or Alt+Down one row (into the place of the card above or below);
+// Alt+Up or Alt+Down on a group's title moves the group.
 windowsElement.addEventListener('keydown', (event) => {
   const up = event.key === 'ArrowUp' || event.key === 'ArrowLeft'
   const vertical = event.key === 'ArrowUp' || event.key === 'ArrowDown'
   if (
     !event.altKey ||
-    (!vertical && !['ArrowLeft', 'ArrowRight'].includes(event.key))
+    (!vertical && event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')
   )
     return
   const moved = movableAt(event.target as Element)
   const group = moved?.classList.contains('group')
   if (!moved || (group && !vertical)) return
   event.preventDefault() // Alt+Left would otherwise go back in history
-  if (!group && vertical) {
-    const other = cardInColumn(moved, up ? -1 : 1)
-    if (!other) return
-    const grid = moved.parentElement
-    grid?.append(...swapped([...grid.children], moved, other))
-  } else {
-    const next = up ? moved.previousElementSibling : moved.nextElementSibling
-    if (!next) return
-    if (up) next.before(moved)
-    else next.after(moved)
-  }
+  const other =
+    !group && vertical
+      ? cardInColumn(moved, up ? -1 : 1)
+      : up
+        ? moved.previousElementSibling
+        : moved.nextElementSibling
+  if (!other) return
+  takePlace(moved, other)
   const focus = () =>
     document
       .querySelector<HTMLElement>(

@@ -146,71 +146,10 @@
   visibility: hidden;
 }
 
-/* What is being dragged. */
+/* What is being dragged, in the place it will land. */
 .card.dragging,
 .group.dragging {
   opacity: 0.4;
-}
-
-/* Where it lands: a line beside a card, or above or below a group. */
-.card,
-.group {
-  position: relative;
-}
-
-.drop-before::before,
-.drop-after::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--accent);
-}
-
-.drop-before::before {
-  left: calc(-1 * var(--space-1) - 1px);
-}
-
-.drop-after::before {
-  right: calc(-1 * var(--space-1) - 1px);
-}
-
-/* Into a column: a line in the gap above or below a card. */
-.drop-above::before,
-.drop-below::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--accent);
-}
-
-.drop-above::before {
-  top: calc(-1 * var(--space-1) - 1px);
-}
-
-.drop-below::before {
-  bottom: calc(-1 * var(--space-1) - 1px);
-}
-
-.group.drop-before::before,
-.group.drop-after::before {
-  left: 0;
-  right: 0;
-  width: auto;
-  height: 2px;
-}
-
-.group.drop-before::before {
-  top: calc(-1 * var(--space-2));
-  bottom: auto;
-}
-
-.group.drop-after::before {
-  top: auto;
-  bottom: calc(-1 * var(--space-2));
 }
 
 /* The tab in front of its window. */
