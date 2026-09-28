@@ -120,30 +120,37 @@ export function isArranged(
   return ids(arrangement) !== ids(noArrangement)
 }
 
-/** Where a card pushed down a row goes: in front of one card, or after one. */
-export type Landing<T> = { before: T } | { after: T }
-
-const hole = Symbol('hole')
-
 /**
- * Drops moved into a column of the grid, in the gap above lower: moved
- * takes lower's place, and lower goes one row down (to `landing`: in front
- * of the card that was below it, or after the last card of its run when
- * nothing was). Rows above stay as they are; everything after shifts along.
- * Dropping the card below lower gives a swap.
+ * Drops moved into a cell of a run of cards shown `columns` wide (a run
+ * starts on a new row: at the top of a window, or below a group). moved ends
+ * up exactly in that cell and the card that was there right below it; every
+ * other card keeps its order, closing up the place moved left. Past the end
+ * of the run (no such cell), they go last.
  */
-export function dropInColumn<T>(
-  list: readonly T[],
+export function dropInCell<T>(
+  run: readonly T[],
   moved: T,
-  lower: T,
-  landing: Landing<T>,
+  cell: number,
+  columns: number,
 ): T[] {
-  // Marks where moved was, so lower can go there if that's its landing.
-  const result: (T | typeof hole)[] = list.map((item) =>
-    item === lower ? moved : item === moved ? hole : item,
-  )
-  const anchor = 'before' in landing ? landing.before : landing.after
-  const at = result.indexOf(anchor === moved ? hole : anchor)
-  result.splice('before' in landing ? at : at + 1, 0, lower)
-  return result.filter((item): item is T => item !== hole)
+  const lower = run[cell] === moved ? undefined : run[cell]
+  const rest = run.filter((item) => item !== moved && item !== lower)
+  const result: (T | undefined)[] = Array.from({
+    length: rest.length + (lower === undefined ? 1 : 2),
+  })
+  const last = result.length - 1
+  if (lower === undefined) {
+    result[Math.min(cell, last)] = moved
+  } else {
+    const lowerAt = Math.min(cell + columns, last)
+    result[lowerAt] = lower
+    result[Math.min(cell, lowerAt - 1)] = moved
+  }
+  let next = 0
+  return result.map((item) => item ?? rest[next++])
+}
+
+/** The list with two items trading places. */
+export function swapped<T>(list: readonly T[], a: T, b: T): T[] {
+  return list.map((item) => (item === a ? b : item === b ? a : item))
 }

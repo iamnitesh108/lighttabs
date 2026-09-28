@@ -1,11 +1,12 @@
 import { plural } from '../../core/format.ts'
-import type { Arrangement, Landing, OverviewItem } from '../../core/overview.ts'
+import type { Arrangement, OverviewItem } from '../../core/overview.ts'
 import {
   arrangementKey,
-  dropInColumn,
+  dropInCell,
   isArranged,
   noArrangement,
   overviewOf,
+  swapped,
   tabsOf,
 } from '../../core/overview.ts'
 import { placeholderPath } from '../../core/placeholder.ts'
@@ -333,8 +334,8 @@ document.addEventListener('click', (event) => {
 // The tab bar itself doesn't change.
 //
 // Near a card's left or right side, a card goes beside it. Near its top or
-// bottom, it goes into that column: it takes the place of the card below
-// the gap, which moves one row down (see dropInColumn).
+// bottom, it goes into that column: into the cell below the gap, with the
+// card that was there right below it (see dropInCell).
 
 /** Where the dragged one lands if let go now. */
 type DropAt =
@@ -411,32 +412,51 @@ function cardInColumn(card: HTMLElement, step: -1 | 1): HTMLElement | null {
   return null
 }
 
-/** The last card of the run a card is in (before a group, or the end). */
-function runEnd(card: HTMLElement): HTMLElement {
-  let last = card
-  while (isCard(last.nextElementSibling)) last = last.nextElementSibling
-  return last
+/** The run of cards a card is in: between groups, or the ends of the grid. */
+function runOf(card: HTMLElement): HTMLElement[] {
+  let first = card
+  while (isCard(first.previousElementSibling))
+    first = first.previousElementSibling
+  const run = [first]
+  for (
+    let next = first.nextElementSibling;
+    isCard(next);
+    next = next.nextElementSibling
+  )
+    run.push(next)
+  return run
+}
+
+/** How many columns a grid of cards shows now (it depends on the width). */
+function columnsOf(grid: Element): number {
+  return getComputedStyle(grid).gridTemplateColumns.split(' ').length
 }
 
 /**
- * Puts moved into lower's place; lower goes to landing, by default one row
- * down (in front of the card below it, or after the last of its run).
+ * Moves a card into the cell of another card of a run, or the cell below
+ * it; the card in that cell goes right below (see dropInCell).
  */
-function moveIntoColumn(
+function moveToCell(
   moved: HTMLElement,
-  lower: HTMLElement,
-  landing?: Landing<HTMLElement>,
+  card: HTMLElement,
+  rowsDown: 0 | 1,
 ): void {
-  const container = lower.parentElement
-  if (!container) return
-  const below = cardInColumn(lower, 1)
-  const order = dropInColumn(
-    [...container.children] as HTMLElement[],
+  const grid = card.parentElement
+  if (!grid) return
+  const run = runOf(card)
+  const columns = columnsOf(grid)
+  const placed = dropInCell(
+    run,
     moved,
-    lower,
-    landing ?? (below ? { before: below } : { after: runEnd(lower) }),
+    run.indexOf(card) + rowsDown * columns,
+    columns,
   )
-  container.append(...order)
+  // The grid's order with the run replaced, wherever moved came from.
+  const stay = run.filter((c) => c !== moved)
+  const order = ([...grid.children] as HTMLElement[]).filter((c) => c !== moved)
+  if (stay.length === 0) return
+  order.splice(order.indexOf(stay[0]), stay.length, ...placed)
+  grid.append(...order)
 }
 
 /** Saves the new order of the moved one and its siblings, then redraws. */
@@ -472,7 +492,7 @@ function dropPoint(
     return { kind: 'beside', next: over, after: x > 0 }
   const upper = y < 0 ? cardInColumn(over, -1) : over
   const lower = y < 0 ? over : cardInColumn(over, 1)
-  if (upper === moved || lower === moved) return null
+  if (lower === moved) return null // its own cell
   return { kind: 'column', upper, lower }
 }
 
@@ -518,10 +538,9 @@ windowsElement.addEventListener('dragend', (event) => {
     if (at.after) at.next.after(moved)
     else at.next.before(moved)
   } else if (at.lower) {
-    moveIntoColumn(moved, at.lower)
+    moveToCell(moved, at.lower, 0)
   } else if (at.upper) {
-    // Nothing below the gap: the end of that run of cards is the closest place.
-    runEnd(at.upper).after(moved)
+    moveToCell(moved, at.upper, 1) // no card below the gap: its empty cell
   }
   void saveOrder(moved)
 })
@@ -544,7 +563,8 @@ windowsElement.addEventListener('keydown', (event) => {
   if (!group && vertical) {
     const other = cardInColumn(moved, up ? -1 : 1)
     if (!other) return
-    moveIntoColumn(moved, other, { before: moved }) // a swap
+    const grid = moved.parentElement
+    grid?.append(...swapped([...grid.children], moved, other))
   } else {
     const next = up ? moved.previousElementSibling : moved.nextElementSibling
     if (!next) return

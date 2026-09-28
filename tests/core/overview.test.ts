@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { Arrangement, Landing } from '../../src/core/overview.ts'
+import type { Arrangement } from '../../src/core/overview.ts'
 import {
   arranged,
-  dropInColumn,
+  dropInCell,
   isArranged,
   overviewOf,
+  swapped,
   withArranged,
 } from '../../src/core/overview.ts'
 import type { TabInfo } from '../../src/core/tab.ts'
@@ -114,47 +115,106 @@ describe('isArranged', () => {
   })
 })
 
-/** A list shown as rows of a 5-wide grid. */
-const rows = (list: string[]) =>
-  Array.from({ length: Math.ceil(list.length / 5) }, (_, r) =>
-    list.slice(r * 5, r * 5 + 5).join(' '),
+/** A list shown as rows of a grid this many columns wide. */
+const rows = (list: string[], columns: number) =>
+  Array.from({ length: Math.ceil(list.length / columns) }, (_, r) =>
+    list.slice(r * columns, r * columns + columns).join(' '),
   )
 
-describe('dropInColumn', () => {
-  // A 5-wide grid:  A B C D E / F G H I J / K L M N O, then X.
-  const grid = [...'ABCDEFGHIJKLMNO', 'X']
+describe('dropInCell', () => {
+  const wide5 = [...'ABCDEFGHIJKLMNO', 'X'] // A B C D E / F G H I J / K L M N O / X
+  const wide4 = [...'ABCDEFGHIJKL'] // A B C D / E F G H / I J K L
+
   it.each([
     {
       name: 'X between E and J',
+      run: wide5,
       moved: 'X',
-      lower: 'J',
-      landing: { before: 'O' },
+      cell: 9, // J's cell
+      columns: 5,
       want: ['A B C D E', 'F G H I X', 'K L M N J', 'O'],
     },
     {
       name: 'X between B and G',
+      run: wide5,
       moved: 'X',
-      lower: 'G',
-      landing: { before: 'L' },
+      cell: 6,
+      columns: 5,
       want: ['A B C D E', 'F X H I J', 'K G L M N', 'O'],
     },
     {
-      name: 'the card below moves up: a swap',
-      moved: 'L',
-      lower: 'G',
-      landing: { before: 'L' },
-      want: ['A B C D E', 'F L H I J', 'K G M N O', 'X'],
+      name: 'F between C and G: from just before the cell',
+      run: wide4,
+      moved: 'F',
+      cell: 6,
+      columns: 4,
+      want: ['A B C D', 'E H F I', 'J K G L'],
     },
     {
-      name: 'nothing below lower: it goes after the last card',
-      moved: 'X',
-      lower: 'N',
-      landing: { after: 'O' },
-      want: ['A B C D E', 'F G H I J', 'K L M X O', 'N'],
+      name: 'A between C and G: from the row above',
+      run: wide4,
+      moved: 'A',
+      cell: 6,
+      columns: 4,
+      want: ['B C D E', 'F H A I', 'J K G L'],
     },
-  ])('$name', ({ moved, lower, landing, want }) => {
-    expect(
-      rows(dropInColumn(grid, moved, lower, landing as Landing<string>)),
-    ).toEqual(want)
+    {
+      name: 'J between B and F: from the row below (a swap)',
+      run: wide4,
+      moved: 'J',
+      cell: 5,
+      columns: 4,
+      want: ['A B C D', 'E J G H', 'I F K L'],
+    },
+    {
+      name: 'L between A and E: from the last cell',
+      run: wide4,
+      moved: 'L',
+      cell: 4,
+      columns: 4,
+      want: ['A B C D', 'L F G H', 'E I J K'],
+    },
+    {
+      name: 'nothing in the cell below: that card goes last',
+      run: wide4,
+      moved: 'A',
+      cell: 9, // J, which has nothing below
+      columns: 4,
+      want: ['B C D E', 'F G H I', 'K A L J'], // A in J's old cell
+    },
+    {
+      name: 'an empty cell past the end: the card goes last',
+      run: wide4,
+      moved: 'B',
+      cell: 13,
+      columns: 4,
+      want: ['A C D E', 'F G H I', 'J K L B'],
+    },
+    {
+      name: 'dropped into its own cell: nothing changes',
+      run: wide4,
+      moved: 'F',
+      cell: 5,
+      columns: 4,
+      want: ['A B C D', 'E F G H', 'I J K L'],
+    },
+  ])('$name', ({ run, moved, cell, columns, want }) => {
+    expect(rows(dropInCell(run, moved, cell, columns), columns)).toEqual(want)
+  })
+
+  it('takes a card from outside the run', () => {
+    // Y comes from another run of cards (say, below a group).
+    expect(rows(dropInCell(wide4, 'Y', 1, 4), 4)).toEqual([
+      'A Y C D',
+      'E B F G',
+      'H I J K',
+      'L',
+    ])
+  })
+})
+
+describe('swapped', () => {
+  it('trades two places and leaves the rest', () => {
+    expect(swapped([...'ABCD'], 'B', 'D')).toEqual([...'ADCB'])
   })
 })
