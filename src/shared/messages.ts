@@ -53,6 +53,8 @@ export type Requests = {
     reply: { saved: number }
   }
   'close-tab': { request: { tabId: number }; reply: null }
+  'arrange-cards': { request: { tabIds: number[] }; reply: null }
+  'reset-card-order': { request: Record<string, never>; reply: null }
   'open-saved': { request: { windowId?: number }; reply: null }
   'open-overview': { request: { windowId?: number }; reply: null }
   'restore-session': {

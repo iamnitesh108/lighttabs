@@ -285,4 +285,7 @@ export class MemoryValue<T> implements ValueStore<T> {
   async set(value: T): Promise<void> {
     this.value = value
   }
+  async update(change: (value: T | undefined) => T): Promise<void> {
+    this.value = change(this.value)
+  }
 }

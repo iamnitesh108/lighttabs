@@ -4,6 +4,7 @@
 // on demand, and only listeners registered right away receive the event.
 
 import { placeholderPath } from '../core/placeholder.ts'
+import { cardOrderKey } from '../core/overview.ts'
 import { countTabs } from '../core/sessions.ts'
 import { isSuspended } from '../core/tab.ts'
 import { ActivityStore } from '../platform/activity-store.ts'
@@ -16,6 +17,7 @@ import { SettingsStore } from '../platform/settings-store.ts'
 import type { Message } from '../shared/messages.ts'
 import { ActivityTracker } from './activity-tracker.ts'
 import { Badge } from './badge.ts'
+import { CardOrder } from './card-order.ts'
 import { actionOf, menus } from './menus.ts'
 import { OverviewToggle } from './overview-toggle.ts'
 import { Pages } from './pages.ts'
@@ -62,6 +64,10 @@ const overview = new OverviewToggle(
   browser,
   pages,
   new SessionValue<Target>('overview-opened-from'),
+)
+const cardOrder = new CardOrder(
+  browser,
+  new SessionValue<number[]>(cardOrderKey),
 )
 const actions = tabActions(suspender, saver, pages, overview)
 
@@ -115,6 +121,11 @@ const handlers: Handlers = {
     saved: await saver.saveAllWindows(windowId),
   }),
   'close-tab': async ({ tabId }) => (await browser.removeTabs([tabId]), null),
+  'arrange-cards': async ({ tabIds }) => (
+    await cardOrder.arrange(tabIds),
+    null
+  ),
+  'reset-card-order': async () => (await cardOrder.reset(), null),
   'open-saved': async ({ windowId }) => (await pages.showSaved(windowId), null),
   'open-overview': async ({ windowId }) => (
     await pages.showOverview(windowId),
@@ -193,6 +204,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 })
 chrome.tabs.onReplaced.addListener((added, removed) => {
   void activity.tabReplaced(added, removed)
+  void cardOrder.tabReplaced(added, removed)
   badge.scheduleUpdate()
 })
 settings.onChange(() => badge.scheduleUpdate())

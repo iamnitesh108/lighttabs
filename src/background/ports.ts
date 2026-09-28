@@ -35,4 +35,6 @@ export interface ActivityRepository {
 export interface ValueStore<T> {
   get(): Promise<T | undefined>
   set(value: T): Promise<void>
+  /** Read-modify-write, one at a time, so no change is lost. */
+  update(change: (value: T | undefined) => T): Promise<void>
 }
