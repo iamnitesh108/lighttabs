@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { Arrangement } from '../../src/core/overview.ts'
 import {
   arranged,
   isArranged,
@@ -10,34 +11,64 @@ import type { TabInfo } from '../../src/core/tab.ts'
 const tab = (id: number, windowId: number, index: number, groupId = -1) =>
   ({ id, windowId, index, groupId }) as TabInfo
 
+/** A window's items in short: a tab as its id, a group as [groupId, tab ids]. */
+function shown(tabs: readonly TabInfo[], arrangement?: Arrangement) {
+  return overviewOf(tabs, arrangement).map((w) =>
+    w.items.map((i) =>
+      i.kind === 'tab' ? i.tab.id : [i.groupId, i.tabs.map((t) => t.id)],
+    ),
+  )
+}
+
+// Window 1: tabs 1, 2 (A), group 7 with 3, 4 (B), tabs 5, 6 (C). Window 2: group 9.
+const tabs = [
+  tab(4, 1, 3, 7),
+  tab(1, 1, 0),
+  tab(2, 1, 1),
+  tab(3, 1, 2, 7),
+  tab(5, 1, 4),
+  tab(6, 1, 5),
+  tab(7, 2, 0, 9),
+]
+
 describe('overviewOf', () => {
-  it('groups tabs by window, then by runs of one tab group, in tab order', () => {
-    const tabs = [
-      tab(3, 1, 2, 7),
-      tab(1, 1, 0),
-      tab(2, 1, 1, 7),
-      tab(4, 1, 3),
-      tab(5, 2, 0, 9),
-    ]
-    const ids = overviewOf(tabs).map((w) => ({
-      windowId: w.windowId,
-      sections: w.sections.map((s) => [s.groupId, s.tabs.map((t) => t.id)]),
-    }))
-    expect(ids).toEqual([
-      {
-        windowId: 1,
-        sections: [
-          [-1, [1]],
-          [7, [2, 3]],
-          [-1, [4]],
-        ],
-      },
-      { windowId: 2, sections: [[9, [5]]] },
-    ])
+  it('lists each window in tab order, each group as one item', () => {
+    expect(shown(tabs)).toEqual([[1, 2, [7, [3, 4]], 5, 6], [[9, [7]]]])
+  })
+
+  it.each([
+    {
+      name: 'a tab from after a group moves before it (C to A)',
+      items: ['tab:5', 'tab:1'],
+      want: [5, 2, [7, [3, 4]], 1, 6],
+    },
+    {
+      name: 'a group moves between two tabs',
+      items: ['tab:1', 'group:7', 'tab:2'],
+      want: [1, [7, [3, 4]], 2, 5, 6],
+    },
+    {
+      name: 'a group moves to the end',
+      items: ['tab:1', 'tab:2', 'tab:5', 'tab:6', 'group:7'],
+      want: [1, 2, 5, 6, [7, [3, 4]]],
+    },
+    {
+      name: 'nothing moves to another window',
+      items: ['group:9', 'tab:1'],
+      want: [1, 2, [7, [3, 4]], 5, 6],
+    },
+  ])('$name', ({ items, want }) => {
+    expect(shown(tabs, { cards: [], items })[0]).toEqual(want)
+  })
+
+  it('arranges tabs inside a group, which moved too', () => {
+    expect(
+      shown(tabs, { cards: [4, 3], items: ['group:7', 'tab:1'] })[0],
+    ).toEqual([[7, [4, 3]], 2, 1, 5, 6])
   })
 })
 
-const ids = (tabs: readonly TabInfo[]) => tabs.map((t) => t.id)
+const ids = (list: readonly TabInfo[]) => list.map((t) => t.id)
 
 describe('arranged', () => {
   const section = [tab(1, 1, 0), tab(2, 1, 1), tab(3, 1, 2), tab(4, 1, 3)]
@@ -60,7 +91,7 @@ describe('arranged', () => {
       want: [3, 2, 1, 4],
     },
   ])('$name', ({ order, want }) => {
-    expect(ids(arranged(section, order))).toEqual(want)
+    expect(ids(arranged(section, order, (t) => t.id))).toEqual(want)
   })
 })
 
@@ -70,23 +101,14 @@ describe('withArranged', () => {
   })
 })
 
-describe('overviewOf with an order', () => {
-  it('arranges within each section, never across a group', () => {
-    const tabs = [tab(1, 1, 0), tab(2, 1, 1, 7), tab(3, 1, 2, 7), tab(4, 1, 3)]
-    // 4 was put before 1, but they are in different sections (a group between).
-    const sections = overviewOf(tabs, [4, 1, 3, 2])[0].sections
-    expect(sections.map((s) => ids(s.tabs))).toEqual([[1], [3, 2], [4]])
-  })
-})
-
 describe('isArranged', () => {
-  const tabs = [tab(1, 1, 0), tab(2, 1, 1)]
   it.each([
-    { order: [], want: false },
-    { order: [1, 2], want: false }, // saved, but the same as the tab strip
-    { order: [2, 1], want: true },
-    { order: [9, 8], want: false }, // only closed tabs
-  ])('$order → $want', ({ order, want }) => {
-    expect(isArranged(tabs, order)).toBe(want)
+    { cards: [], items: [], want: false },
+    { cards: [3, 4], items: ['tab:1', 'tab:2'], want: false }, // same as the tab strip
+    { cards: [4, 3], items: [], want: true },
+    { cards: [9, 8], items: [], want: false }, // only closed tabs
+    { cards: [], items: ['group:7', 'tab:1'], want: true },
+  ])('cards $cards, items $items → $want', ({ cards, items, want }) => {
+    expect(isArranged(tabs, { cards, items })).toBe(want)
   })
 })

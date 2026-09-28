@@ -1,6 +1,12 @@
 import { plural } from '../../core/format.ts'
-import type { TabSection } from '../../core/overview.ts'
-import { cardOrderKey, isArranged, overviewOf } from '../../core/overview.ts'
+import type { Arrangement, OverviewItem } from '../../core/overview.ts'
+import {
+  arrangementKey,
+  isArranged,
+  noArrangement,
+  overviewOf,
+  tabsOf,
+} from '../../core/overview.ts'
 import { placeholderPath } from '../../core/placeholder.ts'
 import type { GroupInfo } from '../../core/sessions.ts'
 import type { TabInfo } from '../../core/tab.ts'
@@ -24,7 +30,7 @@ const emptyElement = byId('empty')
 const search = byId<HTMLInputElement>('search')
 const resetOrder = byId<HTMLButtonElement>('reset-order')
 /** Read here; only the background writes it. */
-const savedOrder = new SessionValue<number[]>(cardOrderKey)
+const savedOrder = new SessionValue<Arrangement>(arrangementKey)
 
 let tabs: TabInfo[] = []
 let groups = new Map<number, GroupInfo>()
@@ -37,7 +43,7 @@ let ownTabId: number | undefined
 async function refresh(): Promise<void> {
   tabs = (await browser.queryTabs()).filter((t) => t.id !== ownTabId)
   groups = await groupsOf(tabs)
-  const order = (await savedOrder.get()) ?? []
+  const order = (await savedOrder.get()) ?? noArrangement
   const windows = overviewOf(tabs, order)
   resetOrder.hidden = !isArranged(tabs, order)
   const suspended = tabs.filter(isSuspended).length
@@ -50,20 +56,20 @@ async function refresh(): Promise<void> {
     .join(' · ')
 
   windowsElement.replaceChildren(
-    ...windows.map((window, i) => {
-      const count = window.sections.reduce((n, s) => n + s.tabs.length, 0)
-      return el(
+    ...windows.map((window, i) =>
+      el(
         'section',
         { class: 'window' },
         windows.length > 1 &&
           el(
             'h2',
             { class: 'window-title' },
-            `Window ${i + 1} · ${plural(count, 'tab')}`,
+            `Window ${i + 1} · ${plural(tabsOf(window.items).length, 'tab')}`,
           ),
-        ...window.sections.map(renderSection),
-      )
-    }),
+        // One grid per window: ungrouped tabs as cards, each group a whole row.
+        el('div', { class: 'cards items' }, ...window.items.map(renderItem)),
+      ),
+    ),
   )
   showSearch()
 }
@@ -98,33 +104,39 @@ function showSearch(): void {
   emptyElement.textContent = searching ? 'No tabs match.' : 'No other tabs.'
 }
 
-function renderSection(section: TabSection): HTMLElement {
-  const grid = el(
-    'div',
-    { class: 'cards' },
-    ...section.tabs.map((tab) => {
-      const card = renderCard(tab, [], false)
-      card.draggable = true // search results keep their best-first order
-      return card
-    }),
-  )
-  const group = groups.get(section.groupId)
-  if (!group) return el('div', { class: 'section' }, grid)
+function renderItem(item: OverviewItem): HTMLElement {
+  if (item.kind === 'tab') return movableCard(item.tab, item.key)
+  const group = groups.get(item.groupId)
   return el(
     'div',
     {
-      class: 'section group',
-      style: `--group-color: ${groupColorValues[group.color]}`,
+      class: 'group',
+      'data-key': item.key,
+      style: group && `--group-color: ${groupColorValues[group.color]}`,
     },
     el(
       'h3',
-      { class: 'group-title' },
+      {
+        class: 'group-title',
+        // The whole group is moved by its title.
+        draggable: 'true',
+        tabindex: 0,
+        title: 'Drag to move the group, or press Alt+Up or Alt+Down',
+      },
       el('span', { class: 'dot' }),
-      group.title || 'Tab group',
-      el('span', { class: 'muted' }, plural(section.tabs.length, 'tab')),
+      group?.title || 'Tab group',
+      el('span', { class: 'muted' }, plural(item.tabs.length, 'tab')),
     ),
-    grid,
+    el('div', { class: 'cards' }, ...item.tabs.map((tab) => movableCard(tab))),
   )
+}
+
+/** A card that can be dragged (search results keep their best-first order). */
+function movableCard(tab: TabInfo, key?: string): HTMLElement {
+  const card = renderCard(tab, [], false)
+  card.draggable = true
+  if (key) card.dataset.key = key
+  return card
 }
 
 function renderCard(
@@ -312,80 +324,127 @@ document.addEventListener('click', (event) => {
     )
 })
 
-// Arranging cards by hand. The card moves while it's dragged, so you see
-// where it lands; it can only move among the cards of its own section, so a
-// group's tabs stay in their group. The tab bar itself doesn't change.
-let dragged: HTMLElement | null = null
+// Arranging by hand. Everything moves among its siblings only: an
+// ungrouped card or a whole group (by its title) within its window's grid,
+// a group's card within its group. A line shows where it will land, and
+// it moves when let go: moving it during the drag would shift the grid under
+// the pointer (a group is a whole row) and make it jump back and forth.
+// The tab bar itself doesn't change.
 
-/** Saves the order of the cards in one section, then redraws. */
-async function saveOrder(grid: Element): Promise<void> {
-  const tabIds = [...grid.children].map((c) =>
-    Number((c as HTMLElement).dataset.tab),
+let dragged: HTMLElement | null = null
+/** Where the dragged one lands if let go now. */
+let dropAt: { next: HTMLElement; after: boolean } | null = null
+
+/** Moves the line showing where the dragged one lands. */
+function showDropAt(next: typeof dropAt): void {
+  dropAt?.next.classList.remove('drop-before', 'drop-after')
+  dropAt = next
+  dropAt?.next.classList.add(dropAt.after ? 'drop-after' : 'drop-before')
+}
+
+/** What is moved from this point: a group by its title, else a card. */
+function movableAt(target: Element): HTMLElement | null {
+  return (
+    target.closest('.group-title')?.closest<HTMLElement>('.group') ??
+    target.closest<HTMLElement>('.card')
   )
-  await send('arrange-cards', { tabIds })
+}
+
+/** The child of container that holds target, if any. */
+function childHolding(container: Element, target: Element): HTMLElement | null {
+  let node: Element | null = target
+  while (node && node.parentElement !== container) node = node.parentElement
+  return node as HTMLElement | null
+}
+
+/** Saves the new order of the moved one and its siblings, then redraws. */
+async function saveOrder(moved: HTMLElement): Promise<void> {
+  const container = moved.parentElement
+  if (!container) return
+  const siblings = [...container.children] as HTMLElement[]
+  if (container.classList.contains('items'))
+    await send('arrange-items', {
+      keys: siblings.map((e) => e.dataset.key ?? ''),
+    })
+  else
+    await send('arrange-cards', {
+      tabIds: siblings.map((c) => Number(c.dataset.tab)),
+    })
   await refresh()
 }
 
 windowsElement.addEventListener('dragstart', (event) => {
-  dragged = (event.target as Element).closest<HTMLElement>('.card')
+  dragged = movableAt(event.target as Element)
   if (!dragged || !event.dataTransfer) return
   event.dataTransfer.effectAllowed = 'move'
   dragged.classList.add('dragging')
 })
 
 windowsElement.addEventListener('dragover', (event) => {
-  const grid = dragged?.parentElement
+  const container = dragged?.parentElement
   const target = event.target as Element
-  if (!dragged || !grid || target.closest('.cards') !== grid) return
+  if (!dragged || !container?.contains(target)) return
   event.preventDefault() // allows the drop here
-  const over = target.closest<HTMLElement>('.card')
-  if (!over || over === dragged) return
+  const over = childHolding(container, target)
+  if (!over || over === dragged) return showDropAt(null)
+  // A group fills its row: land above or below it. A card: left or right.
   const box = over.getBoundingClientRect()
-  if (event.clientX > box.left + box.width / 2) over.after(dragged)
-  else over.before(dragged)
+  const after = over.classList.contains('group')
+    ? event.clientY > box.top + box.height / 2
+    : event.clientX > box.left + box.width / 2
+  if (dropAt?.next !== over || dropAt.after !== after)
+    showDropAt({ next: over, after })
 })
 
 windowsElement.addEventListener('drop', (event) => event.preventDefault())
 
-// Saved when the drag ends, not on drop: the drop event doesn't always
+// Moved when the drag ends, not on drop: the drop event doesn't always
 // arrive, but the drag always ends, saying whether the drop was accepted.
 windowsElement.addEventListener('dragend', (event) => {
-  const grid = dragged?.parentElement
-  dragged?.classList.remove('dragging')
+  const moved = dragged
+  const at = dropAt
   dragged = null
-  // Dropped outside its section: put everything back.
-  if (event.dataTransfer?.dropEffect === 'none' || !grid) void refresh()
-  else void saveOrder(grid)
+  showDropAt(null)
+  moved?.classList.remove('dragging')
+  if (!moved || !at || event.dataTransfer?.dropEffect === 'none') return
+  if (at.after) at.next.after(moved)
+  else at.next.before(moved)
+  void saveOrder(moved)
 })
 
-// The same with the keyboard: Alt+Left or Alt+Right on a card.
+// The same with the keyboard: Alt+Left or Alt+Right on a card, Alt+Up or
+// Alt+Down on a group's title, one place at a time.
+const keySteps: Record<string, { group: boolean; step: -1 | 1 }> = {
+  ArrowLeft: { group: false, step: -1 },
+  ArrowRight: { group: false, step: 1 },
+  ArrowUp: { group: true, step: -1 },
+  ArrowDown: { group: true, step: 1 },
+}
+
 windowsElement.addEventListener('keydown', (event) => {
-  if (
-    !event.altKey ||
-    (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')
-  )
-    return
-  const card = (event.target as Element).closest<HTMLElement>('.card')
-  const next =
-    event.key === 'ArrowLeft'
-      ? card?.previousElementSibling
-      : card?.nextElementSibling
-  if (!card?.parentElement || !next) return
+  const key = keySteps[event.key]
+  const moved = event.altKey && key && movableAt(event.target as Element)
+  if (!moved || moved.classList.contains('group') !== key.group) return
   event.preventDefault() // Alt+Left would otherwise go back in history
-  if (event.key === 'ArrowLeft') next.before(card)
-  else next.after(card)
-  card.querySelector<HTMLElement>('.card-open')?.focus()
-  void saveOrder(card.parentElement).then(() =>
+  const next =
+    key.step < 0 ? moved.previousElementSibling : moved.nextElementSibling
+  if (!next) return
+  if (key.step < 0) next.before(moved)
+  else next.after(moved)
+  const focus = () =>
     document
       .querySelector<HTMLElement>(
-        `.card[data-tab="${card.dataset.tab}"] .card-open`,
+        key.group
+          ? `.group[data-key="${moved.dataset.key}"] .group-title`
+          : `.card[data-tab="${moved.dataset.tab}"] .card-open`,
       )
-      ?.focus(),
-  )
+      ?.focus()
+  focus() // moving an element drops its focus
+  void saveOrder(moved).then(focus)
 })
 
 resetOrder.addEventListener('click', async () => {
-  await send('reset-card-order', {})
+  await send('reset-arrangement', {})
   await refresh()
 })
 

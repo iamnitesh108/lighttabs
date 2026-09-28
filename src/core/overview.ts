@@ -1,74 +1,121 @@
 import type { TabInfo } from './tab.ts'
 
-/** Tabs of one tab group (or ungrouped tabs) that sit next to each other. */
-export type TabSection = { groupId: number; tabs: TabInfo[] }
+/**
+ * One entry of a window in the overview: a tab that isn't in a group, or a
+ * whole tab group with its tabs.
+ */
+export type OverviewItem =
+  | { kind: 'tab'; key: string; tab: TabInfo }
+  | { kind: 'group'; key: string; groupId: number; tabs: TabInfo[] }
 
-export type WindowOverview = { windowId: number; sections: TabSection[] }
+export type WindowOverview = { windowId: number; items: OverviewItem[] }
 
-/** Where the order of cards arranged by hand is kept (storage.session). */
-export const cardOrderKey = 'overview-order'
+/** The overview's own order, where cards or groups were moved by hand. */
+export type Arrangement = {
+  /** Tab ids; only the order of tabs within one group counts. */
+  cards: number[]
+  /** Item keys; only the order within one window counts. */
+  items: string[]
+}
+
+export const noArrangement: Arrangement = { cards: [], items: [] }
+
+/** Where the arrangement is kept (storage.session). */
+export const arrangementKey = 'overview-arrangement'
+
+export function tabKey(tabId: number): string {
+  return `tab:${tabId}`
+}
+
+export function groupKey(groupId: number): string {
+  return `group:${groupId}`
+}
 
 /**
  * Arranges tabs the way the tab strip shows them: by window, in tab order,
- * with each run of tabs from one group (or with no group) as a section.
- * The browser keeps a group's tabs together, so each group is one section.
- * Cards moved by hand keep their order within their section.
+ * each group as one item where its first tab is. The browser keeps a
+ * group's tabs together. Then applies what was moved by hand: items within
+ * their window, and tabs within their group.
  */
 export function overviewOf(
   tabs: readonly TabInfo[],
-  order: readonly number[] = [],
+  arrangement: Arrangement = noArrangement,
 ): WindowOverview[] {
   const windows = new Map<number, TabInfo[]>()
   for (const tab of tabs) {
     windows.set(tab.windowId, [...(windows.get(tab.windowId) ?? []), tab])
   }
   return [...windows].map(([windowId, windowTabs]) => {
-    const sections: TabSection[] = []
+    const items: OverviewItem[] = []
+    const groups = new Map<number, TabInfo[]>()
     for (const tab of windowTabs.toSorted((a, b) => a.index - b.index)) {
-      const last = sections.at(-1)
-      if (last && last.groupId === tab.groupId) last.tabs.push(tab)
-      else sections.push({ groupId: tab.groupId, tabs: [tab] })
+      if (tab.groupId < 0) {
+        items.push({ kind: 'tab', key: tabKey(tab.id), tab })
+        continue
+      }
+      const group = groups.get(tab.groupId)
+      if (group) {
+        group.push(tab)
+        continue
+      }
+      const groupTabs = [tab]
+      groups.set(tab.groupId, groupTabs)
+      items.push({
+        kind: 'group',
+        key: groupKey(tab.groupId),
+        groupId: tab.groupId,
+        tabs: groupTabs,
+      })
     }
-    for (const section of sections) section.tabs = arranged(section.tabs, order)
-    return { windowId, sections }
+    for (const item of items) {
+      if (item.kind === 'group')
+        item.tabs = arranged(item.tabs, arrangement.cards, (t) => t.id)
+    }
+    return {
+      windowId,
+      items: arranged(items, arrangement.items, (i) => i.key),
+    }
   })
 }
 
+/** Every tab of a window's items, in the order shown. */
+export function tabsOf(items: readonly OverviewItem[]): TabInfo[] {
+  return items.flatMap((i) => (i.kind === 'tab' ? [i.tab] : i.tabs))
+}
+
 /**
- * Puts the tabs arranged by hand in their saved order, in the places they
- * hold now. Tabs never arranged (new ones, say) stay where the tab strip
- * has them.
+ * Puts the items moved by hand in their saved order, in the places they
+ * hold now. Items never moved (new tabs, say) stay where the tab strip has
+ * them.
  */
-export function arranged(
-  tabs: readonly TabInfo[],
-  order: readonly number[],
-): TabInfo[] {
-  const rank = new Map(order.map((id, i) => [id, i]))
-  const moved = tabs
-    .filter((t) => rank.has(t.id))
-    .toSorted((a, b) => rank.get(a.id)! - rank.get(b.id)!)
+export function arranged<T, K>(
+  items: readonly T[],
+  order: readonly K[],
+  key: (item: T) => K,
+): T[] {
+  const rank = new Map(order.map((k, i) => [k, i]))
+  const moved = items
+    .filter((item) => rank.has(key(item)))
+    .toSorted((a, b) => rank.get(key(a))! - rank.get(key(b))!)
   let next = 0
-  return tabs.map((t) => (rank.has(t.id) ? moved[next++] : t))
+  return items.map((item) => (rank.has(key(item)) ? moved[next++] : item))
 }
 
-/** The saved order after one section's cards were arranged: ids in their new order. */
-export function withArranged(
-  order: readonly number[],
-  ids: readonly number[],
-): number[] {
-  const section = new Set(ids)
-  return [...order.filter((id) => !section.has(id)), ...ids]
+/** The saved order after one group (or window) was arranged: these in their new order. */
+export function withArranged<K>(order: readonly K[], moved: readonly K[]): K[] {
+  const set = new Set(moved)
+  return [...order.filter((k) => !set.has(k)), ...moved]
 }
 
-/** Whether any card is out of tab strip order. */
+/** Whether anything is out of tab strip order. */
 export function isArranged(
   tabs: readonly TabInfo[],
-  order: readonly number[],
+  arrangement: Arrangement,
 ): boolean {
-  const ids = (o: readonly number[]) =>
-    overviewOf(tabs, o)
-      .flatMap((w) => w.sections.flatMap((s) => s.tabs))
+  const ids = (a: Arrangement) =>
+    overviewOf(tabs, a)
+      .flatMap((w) => tabsOf(w.items))
       .map((t) => t.id)
       .join()
-  return order.length > 0 && ids(order) !== ids([])
+  return ids(arrangement) !== ids(noArrangement)
 }

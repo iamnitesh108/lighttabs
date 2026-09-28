@@ -54,17 +54,17 @@
   color: var(--text-muted);
 }
 
-.section + .section {
-  margin-top: var(--space-3);
-}
-
-/* A tab group: a bar in the group's colour down the left side. */
+/* A tab group: a whole row of the grid, with a bar in the group's colour
+   down the left side. Cards before it stay above, cards after it go below. */
 .group {
+  grid-column: 1 / -1;
+  margin: var(--space-2) 0;
   padding-left: var(--space-3);
   border-left: 3px solid var(--group-color);
 }
 
 .group-title {
+  cursor: grab;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -117,6 +117,7 @@
   cursor: pointer;
 }
 
+.group-title:focus-visible,
 .card-open:focus-visible,
 .close:focus-visible {
   outline: 2px solid var(--focus);
@@ -145,9 +146,52 @@
   visibility: hidden;
 }
 
-/* The card being dragged: its place among the others. */
-.card.dragging {
+/* What is being dragged. */
+.card.dragging,
+.group.dragging {
   opacity: 0.4;
+}
+
+/* Where it lands: a line beside a card, or above or below a group. */
+.card,
+.group {
+  position: relative;
+}
+
+.drop-before::before,
+.drop-after::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+}
+
+.drop-before::before {
+  left: calc(-1 * var(--space-1) - 1px);
+}
+
+.drop-after::before {
+  right: calc(-1 * var(--space-1) - 1px);
+}
+
+.group.drop-before::before,
+.group.drop-after::before {
+  left: 0;
+  right: 0;
+  width: auto;
+  height: 2px;
+}
+
+.group.drop-before::before {
+  top: calc(-1 * var(--space-2));
+  bottom: auto;
+}
+
+.group.drop-after::before {
+  top: auto;
+  bottom: calc(-1 * var(--space-2));
 }
 
 /* The tab in front of its window. */
