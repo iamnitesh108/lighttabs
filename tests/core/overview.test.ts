@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { Arrangement } from '../../src/core/overview.ts'
+import type { Arrangement, Landing } from '../../src/core/overview.ts'
 import {
   arranged,
+  dropInColumn,
   isArranged,
   overviewOf,
   withArranged,
@@ -110,5 +111,50 @@ describe('isArranged', () => {
     { cards: [], items: ['group:7', 'tab:1'], want: true },
   ])('cards $cards, items $items → $want', ({ cards, items, want }) => {
     expect(isArranged(tabs, { cards, items })).toBe(want)
+  })
+})
+
+/** A list shown as rows of a 5-wide grid. */
+const rows = (list: string[]) =>
+  Array.from({ length: Math.ceil(list.length / 5) }, (_, r) =>
+    list.slice(r * 5, r * 5 + 5).join(' '),
+  )
+
+describe('dropInColumn', () => {
+  // A 5-wide grid:  A B C D E / F G H I J / K L M N O, then X.
+  const grid = [...'ABCDEFGHIJKLMNO', 'X']
+  it.each([
+    {
+      name: 'X between E and J',
+      moved: 'X',
+      lower: 'J',
+      landing: { before: 'O' },
+      want: ['A B C D E', 'F G H I X', 'K L M N J', 'O'],
+    },
+    {
+      name: 'X between B and G',
+      moved: 'X',
+      lower: 'G',
+      landing: { before: 'L' },
+      want: ['A B C D E', 'F X H I J', 'K G L M N', 'O'],
+    },
+    {
+      name: 'the card below moves up: a swap',
+      moved: 'L',
+      lower: 'G',
+      landing: { before: 'L' },
+      want: ['A B C D E', 'F L H I J', 'K G M N O', 'X'],
+    },
+    {
+      name: 'nothing below lower: it goes after the last card',
+      moved: 'X',
+      lower: 'N',
+      landing: { after: 'O' },
+      want: ['A B C D E', 'F G H I J', 'K L M X O', 'N'],
+    },
+  ])('$name', ({ moved, lower, landing, want }) => {
+    expect(
+      rows(dropInColumn(grid, moved, lower, landing as Landing<string>)),
+    ).toEqual(want)
   })
 })

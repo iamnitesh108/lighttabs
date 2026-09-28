@@ -1,7 +1,8 @@
 import { plural } from '../../core/format.ts'
-import type { Arrangement, OverviewItem } from '../../core/overview.ts'
+import type { Arrangement, Landing, OverviewItem } from '../../core/overview.ts'
 import {
   arrangementKey,
+  dropInColumn,
   isArranged,
   noArrangement,
   overviewOf,
@@ -330,16 +331,30 @@ document.addEventListener('click', (event) => {
 // it moves when let go: moving it during the drag would shift the grid under
 // the pointer (a group is a whole row) and make it jump back and forth.
 // The tab bar itself doesn't change.
+//
+// Near a card's left or right side, a card goes beside it. Near its top or
+// bottom, it goes into that column: it takes the place of the card below
+// the gap, which moves one row down (see dropInColumn).
+
+/** Where the dragged one lands if let go now. */
+type DropAt =
+  | { kind: 'beside'; next: HTMLElement; after: boolean }
+  | { kind: 'column'; upper: HTMLElement | null; lower: HTMLElement | null }
 
 let dragged: HTMLElement | null = null
-/** Where the dragged one lands if let go now. */
-let dropAt: { next: HTMLElement; after: boolean } | null = null
+let dropAt: DropAt | null = null
+
+const dropClasses = ['drop-before', 'drop-after', 'drop-above', 'drop-below']
 
 /** Moves the line showing where the dragged one lands. */
-function showDropAt(next: typeof dropAt): void {
-  dropAt?.next.classList.remove('drop-before', 'drop-after')
+function showDropAt(next: DropAt | null): void {
+  for (const e of document.querySelectorAll(`.${dropClasses.join(', .')}`))
+    e.classList.remove(...dropClasses)
   dropAt = next
-  dropAt?.next.classList.add(dropAt.after ? 'drop-after' : 'drop-before')
+  if (next?.kind === 'beside')
+    next.next.classList.add(next.after ? 'drop-after' : 'drop-before')
+  else if (next?.lower) next.lower.classList.add('drop-above')
+  else next?.upper?.classList.add('drop-below')
 }
 
 /** What is moved from this point: a group by its title, else a card. */
@@ -355,6 +370,73 @@ function childHolding(container: Element, target: Element): HTMLElement | null {
   let node: Element | null = target
   while (node && node.parentElement !== container) node = node.parentElement
   return node as HTMLElement | null
+}
+
+/**
+ * The child nearest to a point: in the gaps between cards (where you aim
+ * to drop between two of them) the pointer is over none of them.
+ */
+function nearestChild(
+  container: Element,
+  x: number,
+  y: number,
+): HTMLElement | null {
+  let nearest: HTMLElement | null = null
+  let best = Infinity
+  for (const child of container.children as HTMLCollectionOf<HTMLElement>) {
+    const box = child.getBoundingClientRect()
+    const dx = Math.max(box.left - x, 0, x - box.right)
+    const dy = Math.max(box.top - y, 0, y - box.bottom)
+    const distance = dx * dx + dy * dy
+    if (distance < best) [nearest, best] = [child, distance]
+  }
+  return nearest
+}
+
+const isCard = (e: Element | null): e is HTMLElement =>
+  e?.classList.contains('card') ?? false
+
+/**
+ * The card right above or below one, in the same column. Only within its
+ * run of cards: a group row in between ends the column.
+ */
+function cardInColumn(card: HTMLElement, step: -1 | 1): HTMLElement | null {
+  const { left, top } = card.getBoundingClientRect()
+  const next = (e: Element) =>
+    step < 0 ? e.previousElementSibling : e.nextElementSibling
+  for (let e = next(card); isCard(e); e = next(e)) {
+    const box = e.getBoundingClientRect()
+    if (Math.abs(box.left - left) < 2 && box.top !== top) return e
+  }
+  return null
+}
+
+/** The last card of the run a card is in (before a group, or the end). */
+function runEnd(card: HTMLElement): HTMLElement {
+  let last = card
+  while (isCard(last.nextElementSibling)) last = last.nextElementSibling
+  return last
+}
+
+/**
+ * Puts moved into lower's place; lower goes to landing, by default one row
+ * down (in front of the card below it, or after the last of its run).
+ */
+function moveIntoColumn(
+  moved: HTMLElement,
+  lower: HTMLElement,
+  landing?: Landing<HTMLElement>,
+): void {
+  const container = lower.parentElement
+  if (!container) return
+  const below = cardInColumn(lower, 1)
+  const order = dropInColumn(
+    [...container.children] as HTMLElement[],
+    moved,
+    lower,
+    landing ?? (below ? { before: below } : { after: runEnd(lower) }),
+  )
+  container.append(...order)
 }
 
 /** Saves the new order of the moved one and its siblings, then redraws. */
@@ -373,6 +455,27 @@ async function saveOrder(moved: HTMLElement): Promise<void> {
   await refresh()
 }
 
+/** Where a drop at this point of over would land. */
+function dropPoint(
+  moved: HTMLElement,
+  over: HTMLElement,
+  event: DragEvent,
+): DropAt | null {
+  const box = over.getBoundingClientRect()
+  const x = (event.clientX - box.left) / box.width - 0.5
+  const y = (event.clientY - box.top) / box.height - 0.5
+  // A group fills its row: land above or below it.
+  if (over.classList.contains('group'))
+    return { kind: 'beside', next: over, after: y > 0 }
+  // Closer to the left or right side than to the top or bottom: beside it.
+  if (Math.abs(x) >= Math.abs(y))
+    return { kind: 'beside', next: over, after: x > 0 }
+  const upper = y < 0 ? cardInColumn(over, -1) : over
+  const lower = y < 0 ? over : cardInColumn(over, 1)
+  if (upper === moved || lower === moved) return null
+  return { kind: 'column', upper, lower }
+}
+
 windowsElement.addEventListener('dragstart', (event) => {
   dragged = movableAt(event.target as Element)
   if (!dragged || !event.dataTransfer) return
@@ -385,16 +488,20 @@ windowsElement.addEventListener('dragover', (event) => {
   const target = event.target as Element
   if (!dragged || !container?.contains(target)) return
   event.preventDefault() // allows the drop here
-  const over = childHolding(container, target)
-  if (!over || over === dragged) return showDropAt(null)
-  // A group fills its row: land above or below it. A card: left or right.
-  const box = over.getBoundingClientRect()
-  const after = over.classList.contains('group')
-    ? event.clientY > box.top + box.height / 2
-    : event.clientX > box.left + box.width / 2
-  if (dropAt?.next !== over || dropAt.after !== after)
-    showDropAt({ next: over, after })
+  const over =
+    childHolding(container, target) ??
+    nearestChild(container, event.clientX, event.clientY)
+  const next = over && over !== dragged ? dropPoint(dragged, over, event) : null
+  if (!sameDropAt(next, dropAt)) showDropAt(next)
 })
+
+function sameDropAt(a: DropAt | null, b: DropAt | null): boolean {
+  if (a?.kind === 'beside' && b?.kind === 'beside')
+    return a.next === b.next && a.after === b.after
+  if (a?.kind === 'column' && b?.kind === 'column')
+    return a.upper === b.upper && a.lower === b.lower
+  return a === b
+}
 
 windowsElement.addEventListener('drop', (event) => event.preventDefault())
 
@@ -407,34 +514,47 @@ windowsElement.addEventListener('dragend', (event) => {
   showDropAt(null)
   moved?.classList.remove('dragging')
   if (!moved || !at || event.dataTransfer?.dropEffect === 'none') return
-  if (at.after) at.next.after(moved)
-  else at.next.before(moved)
+  if (at.kind === 'beside') {
+    if (at.after) at.next.after(moved)
+    else at.next.before(moved)
+  } else if (at.lower) {
+    moveIntoColumn(moved, at.lower)
+  } else if (at.upper) {
+    // Nothing below the gap: the end of that run of cards is the closest place.
+    runEnd(at.upper).after(moved)
+  }
   void saveOrder(moved)
 })
 
-// The same with the keyboard: Alt+Left or Alt+Right on a card, Alt+Up or
-// Alt+Down on a group's title, one place at a time.
-const keySteps: Record<string, { group: boolean; step: -1 | 1 }> = {
-  ArrowLeft: { group: false, step: -1 },
-  ArrowRight: { group: false, step: 1 },
-  ArrowUp: { group: true, step: -1 },
-  ArrowDown: { group: true, step: 1 },
-}
-
+// The same with the keyboard, one place at a time: Alt+Left or Alt+Right
+// on a card moves it along, Alt+Up or Alt+Down swaps it with the card above
+// or below; Alt+Up or Alt+Down on a group's title moves the group.
 windowsElement.addEventListener('keydown', (event) => {
-  const key = keySteps[event.key]
-  const moved = event.altKey && key && movableAt(event.target as Element)
-  if (!moved || moved.classList.contains('group') !== key.group) return
+  const up = event.key === 'ArrowUp' || event.key === 'ArrowLeft'
+  const vertical = event.key === 'ArrowUp' || event.key === 'ArrowDown'
+  if (
+    !event.altKey ||
+    (!vertical && !['ArrowLeft', 'ArrowRight'].includes(event.key))
+  )
+    return
+  const moved = movableAt(event.target as Element)
+  const group = moved?.classList.contains('group')
+  if (!moved || (group && !vertical)) return
   event.preventDefault() // Alt+Left would otherwise go back in history
-  const next =
-    key.step < 0 ? moved.previousElementSibling : moved.nextElementSibling
-  if (!next) return
-  if (key.step < 0) next.before(moved)
-  else next.after(moved)
+  if (!group && vertical) {
+    const other = cardInColumn(moved, up ? -1 : 1)
+    if (!other) return
+    moveIntoColumn(moved, other, { before: moved }) // a swap
+  } else {
+    const next = up ? moved.previousElementSibling : moved.nextElementSibling
+    if (!next) return
+    if (up) next.before(moved)
+    else next.after(moved)
+  }
   const focus = () =>
     document
       .querySelector<HTMLElement>(
-        key.group
+        group
           ? `.group[data-key="${moved.dataset.key}"] .group-title`
           : `.card[data-tab="${moved.dataset.tab}"] .card-open`,
       )

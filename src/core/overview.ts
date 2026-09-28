@@ -119,3 +119,31 @@ export function isArranged(
       .join()
   return ids(arrangement) !== ids(noArrangement)
 }
+
+/** Where a card pushed down a row goes: in front of one card, or after one. */
+export type Landing<T> = { before: T } | { after: T }
+
+const hole = Symbol('hole')
+
+/**
+ * Drops moved into a column of the grid, in the gap above lower: moved
+ * takes lower's place, and lower goes one row down (to `landing`: in front
+ * of the card that was below it, or after the last card of its run when
+ * nothing was). Rows above stay as they are; everything after shifts along.
+ * Dropping the card below lower gives a swap.
+ */
+export function dropInColumn<T>(
+  list: readonly T[],
+  moved: T,
+  lower: T,
+  landing: Landing<T>,
+): T[] {
+  // Marks where moved was, so lower can go there if that's its landing.
+  const result: (T | typeof hole)[] = list.map((item) =>
+    item === lower ? moved : item === moved ? hole : item,
+  )
+  const anchor = 'before' in landing ? landing.before : landing.after
+  const at = result.indexOf(anchor === moved ? hole : anchor)
+  result.splice('before' in landing ? at : at + 1, 0, lower)
+  return result.filter((item): item is T => item !== hole)
+}
