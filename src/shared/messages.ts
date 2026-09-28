@@ -53,6 +53,7 @@ export type Requests = {
     reply: { saved: number }
   }
   'close-tab': { request: { tabId: number }; reply: null }
+  'open-new-tab': { request: { windowId: number }; reply: null }
   'arrange-cards': { request: { tabIds: number[] }; reply: null }
   'arrange-items': { request: { keys: string[] }; reply: null }
   'reset-arrangement': { request: Record<string, never>; reply: null }

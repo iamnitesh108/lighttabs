@@ -30,8 +30,9 @@ export interface Browser {
   /** Like waitForLoad, for the tab's icon changing. */
   waitForIcon(id: number, timeoutMs?: number): Promise<boolean>
   activate(id: number): Promise<void>
+  /** Opens a tab; without a url, the browser's own new tab page. */
   createTab(options: {
-    url: string
+    url?: string
     windowId?: number
     active: boolean
     index?: number
@@ -174,7 +175,7 @@ export class ChromeBrowser implements Browser {
   }
 
   async createTab(options: {
-    url: string
+    url?: string
     windowId?: number
     active: boolean
     index?: number

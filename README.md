@@ -38,6 +38,7 @@ Works in Brave, Chrome, Edge and other Chromium browsers (version 121 or newer).
 - Every open tab as a card, grouped by window and tab group, with a search box: type to filter, Enter to switch to the first match, Escape to clear.
 - Click a card to switch to that tab, or its × to close the tab. Opens from the popup (grid icon), the toolbar icon's menu, or a shortcut you set, in the window you use it in: each window gets its own overview, all showing every tab. Using the shortcut again on the overview takes you back to the tab you came from.
 - Drag cards to arrange them your way: tabs anywhere in their window, a tab group (by its title) between any two tabs, and a group's tabs within the group. Alt+Arrow keys do the same from the keyboard. The tab bar itself doesn't change, and **Tab bar order** puts the cards back.
+- A **+ New tab** card at the end of each window opens a new tab in that window.
 - Uses no resources until you open it.
 
 **Right-click menu**

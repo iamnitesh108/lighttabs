@@ -179,13 +179,14 @@ export class FakeBrowser implements Browser {
   }
 
   async createTab(options: {
-    url: string
+    url?: string
     windowId?: number
     active: boolean
   }): Promise<TabInfo> {
-    const page = parsePlaceholder(options.url, testPlaceholderBase)
+    const url = options.url ?? 'chrome://newtab/'
+    const page = parsePlaceholder(url, testPlaceholderBase)
     const tab = this.addTab({
-      url: page?.url ?? options.url,
+      url: page?.url ?? url,
       title: page?.title ?? '',
       placeholder: page !== null,
       suspendedAt: page?.since ?? null,

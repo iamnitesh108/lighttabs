@@ -71,7 +71,12 @@ async function refresh(): Promise<void> {
             `Window ${i + 1} · ${plural(tabsOf(window.items).length, 'tab')}`,
           ),
         // One grid per window: ungrouped tabs as cards, each group a whole row.
-        el('div', { class: 'cards items' }, ...window.items.map(renderItem)),
+        el(
+          'div',
+          { class: 'cards items' },
+          ...window.items.map(renderItem),
+          newTabCard(window.windowId),
+        ),
       ),
     ),
   )
@@ -132,6 +137,21 @@ function renderItem(item: OverviewItem): HTMLElement {
       el('span', { class: 'muted' }, plural(item.tabs.length, 'tab')),
     ),
     el('div', { class: 'cards' }, ...item.tabs.map((tab) => movableCard(tab))),
+  )
+}
+
+/** The last card of a window's grid: opens a new tab in that window. */
+function newTabCard(windowId: number): HTMLElement {
+  return el(
+    'button',
+    {
+      class: 'new-tab',
+      type: 'button',
+      'data-window': windowId,
+      title: 'Open a new tab in this window',
+    },
+    el('span', { class: 'new-tab-plus', 'aria-hidden': 'true' }, '+'),
+    'New tab',
   )
 }
 
@@ -317,6 +337,11 @@ async function closeTab(card: HTMLElement): Promise<void> {
 
 document.addEventListener('click', (event) => {
   const target = event.target as Element
+  const newTab = target.closest<HTMLElement>('.new-tab')
+  if (newTab) {
+    void send('open-new-tab', { windowId: Number(newTab.dataset.window) })
+    return
+  }
   const card = target.closest<HTMLElement>('.card')
   if (!card) return
   if (target.closest('.close')) void closeTab(card)
@@ -366,6 +391,9 @@ function takePlace(moved: HTMLElement, other: Element): void {
   else other.before(moved)
 }
 
+/** Tab cards and groups can be moved; the new tab card can't. */
+const isMovable = (e: Element): boolean => e.matches('.card, .group')
+
 const isCard = (e: Element | null): e is HTMLElement =>
   e?.classList.contains('card') ?? false
 
@@ -388,7 +416,7 @@ function cardInColumn(card: HTMLElement, step: -1 | 1): HTMLElement | null {
 async function saveOrder(moved: HTMLElement): Promise<void> {
   const container = moved.parentElement
   if (!container) return
-  const siblings = [...container.children] as HTMLElement[]
+  const siblings = [...container.children].filter(isMovable) as HTMLElement[]
   if (container.classList.contains('items'))
     await send('arrange-items', {
       keys: siblings.map((e) => e.dataset.key ?? ''),
@@ -417,7 +445,8 @@ document.addEventListener('dragover', (event) => {
   const target = event.target as Element
   if (!container?.contains(target)) return
   const over = childHolding(container, target)
-  if (!over || over === movedOver) return
+  // The new tab card stays last: nothing is dropped after it.
+  if (!over || over === movedOver || !isMovable(over)) return
   movedOver = over
   if (over !== dragged) takePlace(dragged, over)
 })
@@ -459,7 +488,7 @@ windowsElement.addEventListener('keydown', (event) => {
       : up
         ? moved.previousElementSibling
         : moved.nextElementSibling
-  if (!other) return
+  if (!other || !isMovable(other)) return
   takePlace(moved, other)
   const focus = () =>
     document

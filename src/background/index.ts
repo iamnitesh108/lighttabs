@@ -122,6 +122,11 @@ const handlers: Handlers = {
     saved: await saver.saveAllWindows(windowId),
   }),
   'close-tab': async ({ tabId }) => (await browser.removeTabs([tabId]), null),
+  'open-new-tab': async ({ windowId }) => {
+    await browser.createTab({ windowId, active: true })
+    await browser.focusWindow(windowId)
+    return null
+  },
   'arrange-cards': async ({ tabIds }) => (
     await overviewOrder.arrangeCards(tabIds),
     null
