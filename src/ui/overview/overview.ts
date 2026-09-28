@@ -1,12 +1,13 @@
 import { plural } from '../../core/format.ts'
 import type { TabSection } from '../../core/overview.ts'
-import { overviewOf } from '../../core/overview.ts'
+import { cardOrderKey, isArranged, overviewOf } from '../../core/overview.ts'
 import { placeholderPath } from '../../core/placeholder.ts'
 import type { GroupInfo } from '../../core/sessions.ts'
 import type { TabInfo } from '../../core/tab.ts'
 import { isSuspended } from '../../core/tab.ts'
 import { matchRanges, searchScore, searchWords } from '../../core/tab-search.ts'
 import { ChromeBrowser } from '../../platform/browser.ts'
+import { SessionValue } from '../../platform/session-value.ts'
 import { send } from '../../shared/messages.ts'
 import { byId, el } from '../shared/dom.ts'
 import { faviconUrl } from '../shared/favicon.ts'
@@ -21,6 +22,9 @@ const windowsElement = byId('windows')
 const resultsElement = byId('results')
 const emptyElement = byId('empty')
 const search = byId<HTMLInputElement>('search')
+const resetOrder = byId<HTMLButtonElement>('reset-order')
+/** Read here; only the background writes it. */
+const savedOrder = new SessionValue<number[]>(cardOrderKey)
 
 let tabs: TabInfo[] = []
 let groups = new Map<number, GroupInfo>()
@@ -33,7 +37,9 @@ let ownTabId: number | undefined
 async function refresh(): Promise<void> {
   tabs = (await browser.queryTabs()).filter((t) => t.id !== ownTabId)
   groups = await groupsOf(tabs)
-  const windows = overviewOf(tabs)
+  const order = (await savedOrder.get()) ?? []
+  const windows = overviewOf(tabs, order)
+  resetOrder.hidden = !isArranged(tabs, order)
   const suspended = tabs.filter(isSuspended).length
   byId('summary').textContent = [
     plural(tabs.length, 'tab'),
@@ -96,7 +102,11 @@ function renderSection(section: TabSection): HTMLElement {
   const grid = el(
     'div',
     { class: 'cards' },
-    ...section.tabs.map((tab) => renderCard(tab, [], false)),
+    ...section.tabs.map((tab) => {
+      const card = renderCard(tab, [], false)
+      card.draggable = true // search results keep their best-first order
+      return card
+    }),
   )
   const group = groups.get(section.groupId)
   if (!group) return el('div', { class: 'section' }, grid)
@@ -157,6 +167,7 @@ function renderCard(
         class: 'favicon',
         src: faviconUrl(tab.url, 32),
         alt: '',
+        draggable: 'false', // drag the card, not its icon
         width: 24,
         height: 24,
         loading: 'lazy',
@@ -301,6 +312,83 @@ document.addEventListener('click', (event) => {
     )
 })
 
+// Arranging cards by hand. The card moves while it's dragged, so you see
+// where it lands; it can only move among the cards of its own section, so a
+// group's tabs stay in their group. The tab bar itself doesn't change.
+let dragged: HTMLElement | null = null
+
+/** Saves the order of the cards in one section, then redraws. */
+async function saveOrder(grid: Element): Promise<void> {
+  const tabIds = [...grid.children].map((c) =>
+    Number((c as HTMLElement).dataset.tab),
+  )
+  await send('arrange-cards', { tabIds })
+  await refresh()
+}
+
+windowsElement.addEventListener('dragstart', (event) => {
+  dragged = (event.target as Element).closest<HTMLElement>('.card')
+  if (!dragged || !event.dataTransfer) return
+  event.dataTransfer.effectAllowed = 'move'
+  dragged.classList.add('dragging')
+})
+
+windowsElement.addEventListener('dragover', (event) => {
+  const grid = dragged?.parentElement
+  const target = event.target as Element
+  if (!dragged || !grid || target.closest('.cards') !== grid) return
+  event.preventDefault() // allows the drop here
+  const over = target.closest<HTMLElement>('.card')
+  if (!over || over === dragged) return
+  const box = over.getBoundingClientRect()
+  if (event.clientX > box.left + box.width / 2) over.after(dragged)
+  else over.before(dragged)
+})
+
+windowsElement.addEventListener('drop', (event) => event.preventDefault())
+
+// Saved when the drag ends, not on drop: the drop event doesn't always
+// arrive, but the drag always ends, saying whether the drop was accepted.
+windowsElement.addEventListener('dragend', (event) => {
+  const grid = dragged?.parentElement
+  dragged?.classList.remove('dragging')
+  dragged = null
+  // Dropped outside its section: put everything back.
+  if (event.dataTransfer?.dropEffect === 'none' || !grid) void refresh()
+  else void saveOrder(grid)
+})
+
+// The same with the keyboard: Alt+Left or Alt+Right on a card.
+windowsElement.addEventListener('keydown', (event) => {
+  if (
+    !event.altKey ||
+    (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')
+  )
+    return
+  const card = (event.target as Element).closest<HTMLElement>('.card')
+  const next =
+    event.key === 'ArrowLeft'
+      ? card?.previousElementSibling
+      : card?.nextElementSibling
+  if (!card?.parentElement || !next) return
+  event.preventDefault() // Alt+Left would otherwise go back in history
+  if (event.key === 'ArrowLeft') next.before(card)
+  else next.after(card)
+  card.querySelector<HTMLElement>('.card-open')?.focus()
+  void saveOrder(card.parentElement).then(() =>
+    document
+      .querySelector<HTMLElement>(
+        `.card[data-tab="${card.dataset.tab}"] .card-open`,
+      )
+      ?.focus(),
+  )
+})
+
+resetOrder.addEventListener('click', async () => {
+  await send('reset-card-order', {})
+  await refresh()
+})
+
 search.addEventListener('input', () => {
   selected = 0
   showSearch()
@@ -339,7 +427,8 @@ document.addEventListener('visibilitychange', () => {
 let timer: ReturnType<typeof setTimeout> | undefined
 function scheduleRefresh(): void {
   clearTimeout(timer)
-  timer = setTimeout(() => void refresh(), 150)
+  // Redrawing would drop the card being dragged: wait until it's let go.
+  timer = setTimeout(() => (dragged ? scheduleRefresh() : void refresh()), 150)
 }
 
 for (const event of [

@@ -14,15 +14,26 @@
           <h1 class="title">All tabs</h1>
           <p id="summary" class="muted"></p>
         </div>
-        <label class="visually-hidden" for="search">Search tabs</label>
-        <input
-          id="search"
-          class="search"
-          type="search"
-          placeholder="Search tabs"
-          autocomplete="off"
-          autofocus
-        />
+        <div class="topbar-actions">
+          <button
+            id="reset-order"
+            class="button"
+            type="button"
+            title="Put the cards back in the order of the tab bar"
+            hidden
+          >
+            Tab bar order
+          </button>
+          <label class="visually-hidden" for="search">Search tabs</label>
+          <input
+            id="search"
+            class="search"
+            type="search"
+            placeholder="Search tabs"
+            autocomplete="off"
+            autofocus
+          />
+        </div>
       </div>
     </header>
     <main class="content">
