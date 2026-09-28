@@ -38,10 +38,14 @@ let groups = new Map<number, GroupInfo>()
 let results: TabInfo[] = []
 let selected = 0
 let ownTabId: number | undefined
+const ownUrl = chrome.runtime.getURL('ui/overview/overview.html')
 
 /** Reads the tabs again and redraws. */
 async function refresh(): Promise<void> {
-  tabs = (await browser.queryTabs()).filter((t) => t.id !== ownTabId)
+  // Every window can have an overview; they don't list each other.
+  tabs = (await browser.queryTabs()).filter(
+    (t) => t.id !== ownTabId && !t.url.startsWith(ownUrl),
+  )
   groups = await groupsOf(tabs)
   const order = (await savedOrder.get()) ?? noArrangement
   const windows = overviewOf(tabs, order)
@@ -528,6 +532,10 @@ for (const event of [
 ] as chrome.events.Event<() => void>[]) {
   event.addListener(scheduleRefresh)
 }
+// Cards arranged in another window's overview: show the same order here.
+chrome.storage.session.onChanged.addListener((changes) => {
+  if (arrangementKey in changes) scheduleRefresh()
+})
 chrome.tabs.onUpdated.addListener((_id, change) => {
   // Only what the cards show; loading progress and the like are ignored.
   if (

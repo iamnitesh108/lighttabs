@@ -64,7 +64,7 @@ const saver = new TabSaver({
 const overview = new OverviewToggle(
   browser,
   pages,
-  new SessionValue<Target>('overview-opened-from'),
+  new SessionValue<Record<string, Target>>('overview-opened-from'),
 )
 const overviewOrder = new OverviewOrder(
   browser,

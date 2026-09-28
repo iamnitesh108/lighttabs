@@ -33,15 +33,24 @@ export class Pages {
     return this.show(this.savedPageUrl, windowId)
   }
 
+  /** Every window gets its own overview, each showing the tabs of all windows. */
   showOverview(windowId?: number): Promise<void> {
-    return this.show(this.overviewUrl, windowId)
+    return this.show(this.overviewUrl, windowId, windowId)
   }
 
-  /** Switches to a page of this extension if it's open, else opens it in windowId. */
-  private async show(url: string, windowId?: number): Promise<void> {
-    const open = (await this.browser.queryTabs()).find((t) =>
-      t.url.startsWith(url),
+  /**
+   * Switches to a page of this extension if it's open (only looking in
+   * searchWindow, when given), else opens it in windowId.
+   */
+  private async show(
+    url: string,
+    windowId?: number,
+    searchWindow?: number,
+  ): Promise<void> {
+    const tabs = await this.browser.queryTabs(
+      searchWindow === undefined ? {} : { windowId: searchWindow },
     )
+    const open = tabs.find((t) => t.url.startsWith(url))
     if (open) {
       await this.browser.activate(open.id)
       await this.browser.focusWindow(open.windowId)
