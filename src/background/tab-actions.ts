@@ -1,3 +1,4 @@
+import type { OverviewToggle } from './overview-toggle.ts'
 import type { Pages } from './pages.ts'
 import type { Suspender } from './suspender.ts'
 import type { TabSaver } from './tab-saver.ts'
@@ -13,6 +14,7 @@ export function tabActions(
   suspender: Suspender,
   saver: TabSaver,
   pages: Pages,
+  overview: OverviewToggle,
 ) {
   return {
     'suspend-tab': ({ tabId }: Target) => suspender.toggleTab(tabId),
@@ -23,7 +25,7 @@ export function tabActions(
     'save-window': ({ windowId }: Target) => saver.saveWindow(windowId),
     'exclude-site': ({ tabId }: Target) => suspender.excludeSite(tabId),
     'open-saved': ({ windowId }: Target) => pages.showSaved(windowId),
-    'open-overview': ({ windowId }: Target) => pages.showOverview(windowId),
+    'open-overview': (target: Target) => overview.toggle(target),
   } satisfies Record<string, (target: Target) => Promise<unknown>>
 }
 

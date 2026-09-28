@@ -2,6 +2,7 @@ import type {
   SettingsSource,
   SessionRepository,
   ActivityRepository,
+  ValueStore,
 } from '../../src/background/ports.ts'
 import { parsePlaceholder } from '../../src/core/placeholder.ts'
 import type { GroupInfo, SavedSession } from '../../src/core/sessions.ts'
@@ -273,5 +274,15 @@ export class Clock {
   now = () => this.time
   advanceMinutes(minutes: number): void {
     this.time += minutes * 60_000
+  }
+}
+
+export class MemoryValue<T> implements ValueStore<T> {
+  value: T | undefined
+  async get(): Promise<T | undefined> {
+    return this.value
+  }
+  async set(value: T): Promise<void> {
+    this.value = value
   }
 }

@@ -30,3 +30,9 @@ export interface ActivityRepository {
   read(): Promise<Activity>
   update(change: (activity: Activity) => void): Promise<void>
 }
+
+/** One small value kept across service worker restarts. */
+export interface ValueStore<T> {
+  get(): Promise<T | undefined>
+  set(value: T): Promise<void>
+}

@@ -11,11 +11,13 @@ import { ChromeBrowser } from '../platform/browser.ts'
 import { ChromeBadge } from '../platform/chrome-badge.ts'
 import { createMenus } from '../platform/context-menus.ts'
 import { SessionStore } from '../platform/session-store.ts'
+import { SessionValue } from '../platform/session-value.ts'
 import { SettingsStore } from '../platform/settings-store.ts'
 import type { Message } from '../shared/messages.ts'
 import { ActivityTracker } from './activity-tracker.ts'
 import { Badge } from './badge.ts'
 import { actionOf, menus } from './menus.ts'
+import { OverviewToggle } from './overview-toggle.ts'
 import { Pages } from './pages.ts'
 import type { Handlers } from './router.ts'
 import { route } from './router.ts'
@@ -56,7 +58,12 @@ const saver = new TabSaver({
   videos,
 })
 
-const actions = tabActions(suspender, saver, pages)
+const overview = new OverviewToggle(
+  browser,
+  pages,
+  new SessionValue<Target>('overview-opened-from'),
+)
+const actions = tabActions(suspender, saver, pages, overview)
 
 const handlers: Handlers = {
   'tab-status': ({ tabId }) => suspender.status(tabId),
