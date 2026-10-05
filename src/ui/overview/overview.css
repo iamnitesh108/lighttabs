@@ -118,10 +118,19 @@
 }
 
 .group-title:focus-visible,
-.card-open:focus-visible,
 .close:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 1px;
+}
+
+/* The whole card is outlined, its × inside: the card is what you moved to. */
+.card:has(.card-open:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.card-open:focus-visible {
+  outline: none;
 }
 
 .close {

@@ -7,6 +7,7 @@ import {
   overviewOf,
   tabsOf,
 } from '../../core/overview.ts'
+import { columnOrder } from '../../core/grid-nav.ts'
 import { placeholderPath } from '../../core/placeholder.ts'
 import type { GroupInfo } from '../../core/sessions.ts'
 import type { TabInfo } from '../../core/tab.ts'
@@ -59,28 +60,51 @@ async function refresh(): Promise<void> {
     .filter(Boolean)
     .join(' · ')
 
-  windowsElement.replaceChildren(
-    ...windows.map((window, i) =>
-      el(
-        'section',
-        { class: 'window' },
-        windows.length > 1 &&
-          el(
-            'h2',
-            { class: 'window-title' },
-            `Window ${i + 1} · ${plural(tabsOf(window.items).length, 'tab')}`,
-          ),
-        // One grid per window: ungrouped tabs as cards, each group a whole row.
+  // A redraw while the keyboard is on a card (a tab changed somewhere) would
+  // otherwise send focus back to the top of the page.
+  keepingFocus(() =>
+    windowsElement.replaceChildren(
+      ...windows.map((window, i) =>
         el(
-          'div',
-          { class: 'cards items' },
-          ...window.items.map(renderItem),
-          newTabCard(window.windowId),
+          'section',
+          { class: 'window' },
+          windows.length > 1 &&
+            el(
+              'h2',
+              { class: 'window-title' },
+              `Window ${i + 1} · ${plural(tabsOf(window.items).length, 'tab')}`,
+            ),
+          // One grid per window: ungrouped tabs as cards, each group a whole row.
+          el(
+            'div',
+            { class: 'cards items' },
+            ...window.items.map(renderItem),
+            newTabCard(window.windowId),
+          ),
         ),
       ),
     ),
   )
   showSearch()
+}
+
+/** Runs something that replaces or moves elements, keeping focus where it was. */
+function keepingFocus(change: () => void): void {
+  const selector = focusedSelector()
+  change()
+  if (selector) document.querySelector<HTMLElement>(selector)?.focus()
+}
+
+/** Finds the focused card, group title or new tab card again after a redraw. */
+function focusedSelector(): string | null {
+  const focused = document.activeElement
+  if (!(focused instanceof HTMLElement) || !windowsElement.contains(focused))
+    return null
+  const card = focused.closest<HTMLElement>('.card')
+  if (card) return `.card[data-tab="${card.dataset.tab}"] .${focused.className}`
+  const group = focused.closest<HTMLElement>('.group')
+  if (group) return `.group[data-key="${group.dataset.key}"] .group-title`
+  return `.new-tab[data-window="${focused.dataset.window}"]`
 }
 
 /** Shows everything grouped, or, while searching, the matches best first. */
@@ -489,18 +513,78 @@ windowsElement.addEventListener('keydown', (event) => {
         ? moved.previousElementSibling
         : moved.nextElementSibling
   if (!other || !isMovable(other)) return
-  takePlace(moved, other)
-  const focus = () =>
-    document
-      .querySelector<HTMLElement>(
-        group
-          ? `.group[data-key="${moved.dataset.key}"] .group-title`
-          : `.card[data-tab="${moved.dataset.tab}"] .card-open`,
-      )
-      ?.focus()
-  focus() // moving an element drops its focus
-  void saveOrder(moved).then(focus)
+  // Moving an element drops its focus.
+  keepingFocus(() => takePlace(moved, other))
+  void saveOrder(moved)
 })
+
+// Moving between cards without the mouse: Left and Right go through them in
+// reading order, Up and Down down each column and on to the next one (see
+// columnWalk), and Enter opens it (each stop is a button). From anywhere else on the page, an arrow key goes to
+// the first card. While searching, the arrows move through the results.
+const focusStops = '.card-open, .group-title, .new-tab'
+
+document.addEventListener('keydown', (event) => {
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+  const sideways = event.key === 'ArrowLeft' || event.key === 'ArrowRight'
+  const vertical = event.key === 'ArrowUp' || event.key === 'ArrowDown'
+  if ((!sideways && !vertical) || windowsElement.hidden) return
+  event.preventDefault() // the arrows would scroll the page
+  const stops = [...windowsElement.querySelectorAll<HTMLElement>(focusStops)]
+  const target = event.target as Element
+  // From a card's ×, move as if from the card.
+  const from = windowsElement.contains(target)
+    ? (target.closest('.card')?.querySelector<HTMLElement>('.card-open') ??
+      target.closest<HTMLElement>(focusStops))
+    : null
+  if (!from) {
+    stops[0]?.focus()
+    return
+  }
+  const back = event.key === 'ArrowLeft' || event.key === 'ArrowUp'
+  if (sideways) {
+    stops[stops.indexOf(from) + (back ? -1 : 1)]?.focus()
+    return
+  }
+  const walk = columnWalk()
+  walk[walk.indexOf(from) + (back ? -1 : 1)]?.focus()
+})
+
+/**
+ * Every card in the order Up and Down go through them. Each run of cards
+ * between groups is a grid of its own, gone through column by column; a
+ * group is its title, then its cards the same way.
+ */
+function columnWalk(): HTMLElement[] {
+  const walk: HTMLElement[] = []
+  const addGrid = (stops: HTMLElement[]) => {
+    // Measured by the whole card: its button sits inside the border, a pixel
+    // off from the new tab card in the same column.
+    const boxes = stops.map((s) =>
+      (s.closest('.card') ?? s).getBoundingClientRect(),
+    )
+    const order = columnOrder(boxes)
+    walk.push(...order.map((i) => stops[i]))
+  }
+  for (const grid of windowsElement.querySelectorAll('.items')) {
+    let run: HTMLElement[] = []
+    for (const child of grid.children) {
+      if (child.classList.contains('group')) {
+        addGrid(run)
+        run = []
+        walk.push(...child.querySelectorAll<HTMLElement>('.group-title'))
+        addGrid([...child.querySelectorAll<HTMLElement>('.card-open')])
+      } else {
+        const stop = child.matches(focusStops)
+          ? (child as HTMLElement)
+          : child.querySelector<HTMLElement>(focusStops)
+        if (stop) run.push(stop)
+      }
+    }
+    addGrid(run)
+  }
+  return walk
+}
 
 resetOrder.addEventListener('click', async () => {
   await send('reset-arrangement', {})
