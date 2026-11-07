@@ -17,6 +17,7 @@ const tab = (overrides: Partial<TabInfo>): TabInfo => ({
   audible: false,
   discarded: true,
   placeholder: true,
+  foreignPlaceholder: false,
   suspendedAt: now - 8 * day,
   groupId: -1,
   autoDiscardable: true,

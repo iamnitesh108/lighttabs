@@ -4,7 +4,10 @@ import type {
   ActivityRepository,
   ValueStore,
 } from '../../src/background/ports.ts'
-import { parsePlaceholder } from '../../src/core/placeholder.ts'
+import {
+  parseAnyPlaceholder,
+  parsePlaceholder,
+} from '../../src/core/placeholder.ts'
 import type { GroupInfo, SavedSession } from '../../src/core/sessions.ts'
 import {
   defaultSettings,
@@ -18,14 +21,33 @@ import type { Browser } from '../../src/platform/browser.ts'
 export const testOrigin = 'chrome-extension://abc/'
 export const testPlaceholderBase = `${testOrigin}ui/suspended/suspended.html`
 
+type Shown = Pick<
+  TabInfo,
+  'url' | 'title' | 'placeholder' | 'foreignPlaceholder' | 'suspendedAt'
+>
+
+/**
+ * What a tab showing this address reports. Like ChromeBrowser, a tab on a
+ * suspended-tab page (this install's or another's) reports the page it
+ * stands for.
+ */
+function shown(url: string): Shown {
+  const own = parsePlaceholder(url, testPlaceholderBase)
+  const page = own ?? parseAnyPlaceholder(url)
+  return {
+    url: page?.url ?? url,
+    title: page?.title ?? '',
+    placeholder: page !== null,
+    foreignPlaceholder: page !== null && own === null,
+    suspendedAt: page?.since ?? null,
+  }
+}
+
 /** An in-memory browser that behaves like Chromium where it matters. */
 export class FakeBrowser implements Browser {
   tabs: TabInfo[] = []
   /** The page each tab was on before its current one, for goBack. */
-  private previous = new Map<
-    number,
-    Pick<TabInfo, 'url' | 'title' | 'placeholder' | 'suspendedAt'>
-  >()
+  private previous = new Map<number, Shown>()
   private nextId = 100
   focused: number | null = null
   /** [newId, oldId] for every discard, like tabs.onReplaced. */
@@ -49,6 +71,7 @@ export class FakeBrowser implements Browser {
       audible: false,
       discarded: false,
       placeholder: false,
+      foreignPlaceholder: false,
       suspendedAt: null,
       groupId: -1,
       autoDiscardable: true,
@@ -129,15 +152,10 @@ export class FakeBrowser implements Browser {
       url: tab.url,
       title: tab.title,
       placeholder: tab.placeholder,
+      foreignPlaceholder: tab.foreignPlaceholder,
       suspendedAt: tab.suspendedAt,
     })
-    // Like ChromeBrowser, a tab showing the suspended-tab page reports the
-    // page it stands for.
-    const page = parsePlaceholder(url, testPlaceholderBase)
-    tab.url = page?.url ?? url
-    tab.title = page?.title ?? ''
-    tab.placeholder = page !== null
-    tab.suspendedAt = page?.since ?? null
+    Object.assign(tab, shown(url))
     tab.discarded = false
     return true
   }
@@ -183,13 +201,8 @@ export class FakeBrowser implements Browser {
     windowId?: number
     active: boolean
   }): Promise<TabInfo> {
-    const url = options.url ?? 'chrome://newtab/'
-    const page = parsePlaceholder(url, testPlaceholderBase)
     const tab = this.addTab({
-      url: page?.url ?? url,
-      title: page?.title ?? '',
-      placeholder: page !== null,
-      suspendedAt: page?.since ?? null,
+      ...shown(options.url ?? 'chrome://newtab/'),
       windowId: options.windowId ?? 1,
     })
     if (options.active) await this.activate(tab.id)

@@ -16,6 +16,13 @@ export type TabInfo = {
   discarded: boolean
   /** Shows the suspended-tab page, which loads the site only when clicked. */
   placeholder: boolean
+  /**
+   * The suspended-tab page it shows belongs to another LightTabs install
+   * (an unpacked copy from another folder, or the store version). The
+   * browser blocks pages of an extension that isn't installed, so the tab
+   * shows an error until it gets this install's page.
+   */
+  foreignPlaceholder: boolean
   /** When the suspended-tab page was shown, if the tab has one that says. */
   suspendedAt: number | null
   /** The tab group it's in, or -1 for none. */

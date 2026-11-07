@@ -1,5 +1,6 @@
 import { runLimited } from '../core/limit.ts'
 import { loadLimit, nearestFirst } from '../core/load-order.ts'
+import type { SuspendedPage } from '../core/placeholder.ts'
 import { hasVideoTime } from '../core/video-time.ts'
 import { excludingRule, siteOf } from '../core/sites.ts'
 import { suspendBlocker, timeUntilDue } from '../core/suspend-policy.ts'
@@ -298,11 +299,42 @@ export class Suspender {
    * tab in front keeps showing the page.
    */
   private async suspend(tab: TabInfo, clickToLoad: boolean): Promise<boolean> {
-    const { browser, pages, now, videos } = this.deps
+    const { browser, now, videos } = this.deps
     if (!clickToLoad) return browser.discard(tab.id)
     const url = await videos.addressWithTime(tab)
+    return this.showPlaceholder(tab, { url, title: tab.title, since: now() })
+  }
+
+  /**
+   * Gives suspended tabs of another LightTabs install this install's page,
+   * so they open again. Their address, title and suspend time are kept.
+   * Returns how many tabs were moved over.
+   */
+  async adoptForeignPlaceholders(): Promise<number> {
+    const tabs = await this.deps.browser.queryTabs()
+    let adopted = 0
+    await runLimited(
+      tabs.filter((t) => t.foreignPlaceholder),
+      showPlaceholdersAtOnce,
+      async (tab) => {
+        const page = {
+          url: tab.url,
+          title: tab.title,
+          ...(tab.suspendedAt !== null && { since: tab.suspendedAt }),
+        }
+        if (await this.showPlaceholder(tab, page)) adopted++
+      },
+    )
+    return adopted
+  }
+
+  /** Shows the suspended-tab page in the tab; false if the tab is gone. */
+  private async showPlaceholder(
+    tab: TabInfo,
+    page: SuspendedPage,
+  ): Promise<boolean> {
+    const { browser, pages } = this.deps
     const iconShown = browser.waitForIcon(tab.id, iconWaitMs)
-    const page = { url, title: tab.title, since: now() }
     if (!(await browser.navigate(tab.id, pages.placeholderFor(page))))
       return false
     if (!tab.active && (await iconShown)) await browser.discard(tab.id)

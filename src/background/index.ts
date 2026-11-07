@@ -183,12 +183,15 @@ chrome.runtime.onInstalled.addListener(async () => {
   await ensureTimer()
   await badge.update()
   await createMenus(menus)
+  // A copy loaded from another folder is a new install with a new id.
+  await suspender.adoptForeignPlaceholders()
 })
 
 chrome.runtime.onStartup.addListener(async () => {
   await activity.reset(await browser.queryTabs())
   await ensureTimer()
   await badge.update()
+  await suspender.adoptForeignPlaceholders()
 })
 
 chrome.alarms.onAlarm.addListener((alarm) => {

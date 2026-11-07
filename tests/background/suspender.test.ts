@@ -355,3 +355,56 @@ describe('YouTube position', () => {
     expect(browser.byUrl(video).placeholder).toBe(true)
   })
 })
+
+describe('suspended tabs of another install', () => {
+  // What an unpacked copy loaded from another folder would have.
+  const otherBase =
+    'chrome-extension://iipbaaaaaaaaaaaaaaaaaaaaaaaaaaaa/ui/suspended/suspended.html'
+  const site = 'https://example.com/article'
+
+  it('get this install’s page, keeping the address, title and time', async () => {
+    const { browser, suspender } = setup()
+    browser.addTab({ active: true })
+    const since = 1_700_000_000_000
+    await browser.createTab({
+      url: `${otherBase}#title=Article&url=${encodeURIComponent(site)}&since=${since}`,
+      active: false,
+    })
+    expect(browser.byUrl(site).foreignPlaceholder).toBe(true)
+
+    expect(await suspender.adoptForeignPlaceholders()).toBe(1)
+    const tab = browser.byUrl(site)
+    expect(tab.placeholder).toBe(true)
+    expect(tab.foreignPlaceholder).toBe(false)
+    expect(tab.title).toBe('Article')
+    expect(tab.suspendedAt).toBe(since)
+    expect(tab.discarded).toBe(true) // in the background, so no memory used
+  })
+
+  it('keep the tab you are looking at loaded', async () => {
+    const { browser, suspender } = setup()
+    await browser.createTab({
+      url: `${otherBase}#title=Article&url=${encodeURIComponent(site)}`,
+      active: true,
+    })
+
+    expect(await suspender.adoptForeignPlaceholders()).toBe(1)
+    const tab = browser.byUrl(site)
+    expect(tab.placeholder).toBe(true)
+    expect(tab.suspendedAt).toBe(null) // older pages don't say when
+    expect(tab.discarded).toBe(false)
+  })
+
+  it('leave this install’s suspended tabs and other tabs alone', async () => {
+    const { browser, suspender } = setup({ clickToLoad: true })
+    browser.addTab({ active: true })
+    const open = browser.addTab()
+    const suspended = browser.addTab()
+    await suspender.suspendTab(suspended.id)
+    const before = structuredClone(browser.tabs)
+
+    expect(await suspender.adoptForeignPlaceholders()).toBe(0)
+    expect(browser.tabs).toEqual(before)
+    expect(browser.byUrl(open.url).placeholder).toBe(false)
+  })
+})

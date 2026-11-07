@@ -247,9 +247,8 @@ export class ChromeBrowser implements Browser {
     // A suspended tab of an older install (or another suspender) still
     // holds its real address; without this, saving it would keep an
     // address that no longer opens.
-    const page =
-      parsePlaceholder(address, this.placeholderBase) ??
-      parseAnyPlaceholder(address)
+    const own = parsePlaceholder(address, this.placeholderBase)
+    const page = own ?? parseAnyPlaceholder(address)
     return {
       id: tab.id ?? -1,
       windowId: tab.windowId,
@@ -261,6 +260,7 @@ export class ChromeBrowser implements Browser {
       audible: tab.audible ?? false,
       discarded: tab.discarded,
       placeholder: page !== null,
+      foreignPlaceholder: page !== null && own === null,
       suspendedAt: page?.since ?? null,
       groupId: tab.groupId,
       autoDiscardable: tab.autoDiscardable,
