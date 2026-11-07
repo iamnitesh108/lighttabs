@@ -14,12 +14,19 @@ export type SuspendedPage = {
   title: string
   /** When the tab was suspended (ms since 1970); older placeholders don't say. */
   since?: number
+  /**
+   * Moved over from another install's placeholder. The page before it in
+   * the tab's history is that other placeholder, which the browser blocks,
+   * not the site, so loading opens the address instead of going back.
+   */
+  moved?: true
 }
 
 /** The placeholder address for a page. `base` is the extension's placeholder page. */
 export function placeholderUrl(base: string, page: SuspendedPage): string {
   const params = new URLSearchParams({ title: page.title, url: page.url })
   if (page.since !== undefined) params.set('since', String(page.since))
+  if (page.moved) params.set('moved', '1')
   return `${base}#${params}`
 }
 
@@ -41,6 +48,7 @@ export function parsePlaceholder(
     url: pageUrl,
     title: params.get('title') ?? '',
     ...(since > 0 && { since }),
+    ...(params.get('moved') === '1' && { moved: true as const }),
   }
 }
 

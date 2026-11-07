@@ -210,6 +210,7 @@ chrome.tabs.onUpdated.addListener((tabId, change) => {
   if (change.status === 'complete') void activity.tabNavigated(tabId)
   if (change.favIconUrl) void suspender.settle(tabId)
   if (change.url || change.discarded !== undefined) badge.scheduleUpdate()
+  if (change.url) void suspender.adoptIfForeign(tabId)
 })
 chrome.tabs.onRemoved.addListener((tabId) => {
   void activity.tabClosed(tabId)

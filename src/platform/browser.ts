@@ -261,6 +261,7 @@ export class ChromeBrowser implements Browser {
       discarded: tab.discarded,
       placeholder: page !== null,
       foreignPlaceholder: page !== null && own === null,
+      movedPlaceholder: own?.moved === true,
       suspendedAt: page?.since ?? null,
       groupId: tab.groupId,
       autoDiscardable: tab.autoDiscardable,

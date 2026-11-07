@@ -23,6 +23,11 @@ export type TabInfo = {
    * shows an error until it gets this install's page.
    */
   foreignPlaceholder: boolean
+  /**
+   * Shows this install's suspended-tab page, moved over from another
+   * install's. Going back would land on that blocked page, not the site.
+   */
+  movedPlaceholder: boolean
   /** When the suspended-tab page was shown, if the tab has one that says. */
   suspendedAt: number | null
   /** The tab group it's in, or -1 for none. */

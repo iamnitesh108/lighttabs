@@ -23,7 +23,12 @@ export const testPlaceholderBase = `${testOrigin}ui/suspended/suspended.html`
 
 type Shown = Pick<
   TabInfo,
-  'url' | 'title' | 'placeholder' | 'foreignPlaceholder' | 'suspendedAt'
+  | 'url'
+  | 'title'
+  | 'placeholder'
+  | 'foreignPlaceholder'
+  | 'movedPlaceholder'
+  | 'suspendedAt'
 >
 
 /**
@@ -39,6 +44,7 @@ function shown(url: string): Shown {
     title: page?.title ?? '',
     placeholder: page !== null,
     foreignPlaceholder: page !== null && own === null,
+    movedPlaceholder: own?.moved === true,
     suspendedAt: page?.since ?? null,
   }
 }
@@ -72,6 +78,7 @@ export class FakeBrowser implements Browser {
       discarded: false,
       placeholder: false,
       foreignPlaceholder: false,
+      movedPlaceholder: false,
       suspendedAt: null,
       groupId: -1,
       autoDiscardable: true,
@@ -153,6 +160,7 @@ export class FakeBrowser implements Browser {
       title: tab.title,
       placeholder: tab.placeholder,
       foreignPlaceholder: tab.foreignPlaceholder,
+      movedPlaceholder: tab.movedPlaceholder,
       suspendedAt: tab.suspendedAt,
     })
     Object.assign(tab, shown(url))

@@ -29,6 +29,13 @@ describe('placeholder addresses', () => {
     })
   })
 
+  it('remembers a page moved over from another install, and only then', () => {
+    const page = { url: 'https://a.com/', title: 'A', moved: true as const }
+    expect(parsePlaceholder(placeholderUrl(base, page), base)).toEqual(page)
+    const plain = placeholderUrl(base, { url: 'https://a.com/', title: 'A' })
+    expect(parsePlaceholder(plain, base)).not.toHaveProperty('moved')
+  })
+
   it('ignores other addresses', () => {
     expect(parsePlaceholder('https://example.com/', base)).toBeNull()
     expect(

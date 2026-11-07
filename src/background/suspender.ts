@@ -308,6 +308,8 @@ export class Suspender {
   /**
    * Gives suspended tabs of another LightTabs install this install's page,
    * so they open again. Their address, title and suspend time are kept.
+   * The new page is marked as moved: it opens on top of the blocked one, so
+   * loading it must open the address rather than go back.
    * Returns how many tabs were moved over.
    */
   async adoptForeignPlaceholders(): Promise<number> {
@@ -317,15 +319,29 @@ export class Suspender {
       tabs.filter((t) => t.foreignPlaceholder),
       showPlaceholdersAtOnce,
       async (tab) => {
-        const page = {
-          url: tab.url,
-          title: tab.title,
-          ...(tab.suspendedAt !== null && { since: tab.suspendedAt }),
-        }
-        if (await this.showPlaceholder(tab, page)) adopted++
+        if (await this.adopt(tab)) adopted++
       },
     )
     return adopted
+  }
+
+  /**
+   * The same for one tab that has just arrived on another install's page:
+   * restored after startup, or gone back to it from a page moved over
+   * before moved pages were marked.
+   */
+  async adoptIfForeign(tabId: number): Promise<boolean> {
+    const tab = await this.deps.browser.getTab(tabId)
+    return tab?.foreignPlaceholder === true && this.adopt(tab)
+  }
+
+  private adopt(tab: TabInfo): Promise<boolean> {
+    return this.showPlaceholder(tab, {
+      url: tab.url,
+      title: tab.title,
+      ...(tab.suspendedAt !== null && { since: tab.suspendedAt }),
+      moved: true,
+    })
   }
 
   /** Shows the suspended-tab page in the tab; false if the tab is gone. */
@@ -346,13 +362,15 @@ export class Suspender {
    * because the suspended-tab page was opened on top of it. The browser
    * refuses when the tab is discarded, has no earlier page (restored from a
    * saved list), or you never clicked or typed in that page: then the
-   * address is opened instead. (Clicking the suspended-tab page goes back
-   * from the page itself, which works in more cases.)
+   * address is opened instead, as it is for a page moved over from another
+   * install. (Clicking the suspended-tab page goes back from the page
+   * itself, which works in more cases.)
    */
   private async unsuspend(tab: TabInfo): Promise<void> {
     const { browser } = this.deps
     if (tab.placeholder) {
-      const back = !tab.discarded && !hasVideoTime(tab.url)
+      const back =
+        !tab.discarded && !tab.movedPlaceholder && !hasVideoTime(tab.url)
       if (back && (await browser.goBack(tab.id))) return
       await browser.navigate(tab.id, tab.url)
     } else if (tab.discarded) {

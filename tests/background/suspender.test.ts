@@ -408,3 +408,50 @@ describe('suspended tabs of another install', () => {
     expect(browser.byUrl(open.url).placeholder).toBe(false)
   })
 })
+
+describe('opening a tab moved over from another install', () => {
+  const otherBase =
+    'chrome-extension://iipbaaaaaaaaaaaaaaaaaaaaaaaaaaaa/ui/suspended/suspended.html'
+  const site = 'https://example.com/article'
+
+  it('opens the address, not the blocked page before it', async () => {
+    const { browser, suspender } = setup()
+    await browser.createTab({
+      url: `${otherBase}#title=Article&url=${encodeURIComponent(site)}`,
+      active: true,
+    })
+    await suspender.adoptForeignPlaceholders()
+    const moved = browser.byUrl(site)
+    expect(moved.movedPlaceholder).toBe(true)
+
+    await suspender.unsuspendTab(moved.id)
+    const tab = browser.byUrl(site)
+    expect(tab.placeholder).toBe(false)
+    expect(tab.foreignPlaceholder).toBe(false)
+  })
+})
+
+describe('a tab arriving on another install’s page', () => {
+  const otherBase =
+    'chrome-extension://iipbaaaaaaaaaaaaaaaaaaaaaaaaaaaa/ui/suspended/suspended.html'
+  const site = 'https://example.com/article'
+
+  it('gets this install’s page right away', async () => {
+    const { browser, suspender } = setup()
+    const tab = await browser.createTab({
+      url: `${otherBase}#title=Article&url=${encodeURIComponent(site)}`,
+      active: true,
+    })
+    expect(await suspender.adoptIfForeign(tab.id)).toBe(true)
+    const moved = browser.byUrl(site)
+    expect(moved.foreignPlaceholder).toBe(false)
+    expect(moved.movedPlaceholder).toBe(true)
+  })
+
+  it('leaves any other tab alone', async () => {
+    const { browser, suspender } = setup()
+    const tab = browser.addTab({ active: true })
+    expect(await suspender.adoptIfForeign(tab.id)).toBe(false)
+    expect(await suspender.adoptIfForeign(9999)).toBe(false) // closed
+  })
+})

@@ -1,3 +1,4 @@
+import type { SuspendedPage } from '../../core/placeholder.ts'
 import { parsePlaceholder } from '../../core/placeholder.ts'
 import { hasVideoTime } from '../../core/video-time.ts'
 import { byId } from '../shared/dom.ts'
@@ -18,7 +19,7 @@ if (page) {
   byId('title').textContent = page.title || page.url
   byId('address').textContent = page.url
   showIcon(page.url)
-  button.addEventListener('click', () => load(page.url), { once: true })
+  button.addEventListener('click', () => load(page), { once: true })
 } else {
   byId('title').textContent = 'This suspended tab has no address to load.'
   button.disabled = true
@@ -34,11 +35,13 @@ const backTimeoutMs = 1000
  * clicked or typed in, but history.back() from the page doesn't.
  *
  * A tab restored from a saved list has no earlier page, so it opens the
- * address; so does any tab where going back doesn't start.
+ * address; so does a page moved over from another install (the earlier
+ * page is that install's, which the browser blocks), and any tab where
+ * going back doesn't start.
  */
-function load(url: string): void {
+function load({ url, moved }: SuspendedPage): void {
   // A video's address holds where it was; the earlier page doesn't.
-  if (history.length < 2 || hasVideoTime(url)) {
+  if (history.length < 2 || moved || hasVideoTime(url)) {
     location.replace(url)
     return
   }
