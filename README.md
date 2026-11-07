@@ -69,7 +69,9 @@ Brave can also unload tabs by itself (search for "Memory Saver" in its settings)
 3. Open `brave://extensions` (or `chrome://extensions`, `edge://extensions`) and turn on **Developer mode**.
 4. Click **Load unpacked** and pick the unzipped folder.
 
-To update, download the new release, unzip it over the same folder, and click the reload button on LightTabs in `brave://extensions`. Your settings and saved lists are kept.
+To update, download the new release, unzip it over the same folder, and click the reload button on LightTabs in `brave://extensions`. First switch each window to a normal tab: a suspended tab that is open on screen closes when the extension reloads (the others stay, and `Ctrl+Shift+T` brings a closed one back). Your settings and saved lists are kept. Since 1.2.0 the folder can also move: LightTabs keeps the same id wherever it is loaded from.
+
+**Updating from 1.1.0 or older:** the extension's id changes once, and the browser keeps each extension's data under its id. Before you update, open the saved lists, click **Export** and save a **Backup (.json)**; after the update, **Import** it. Settings go back to their defaults, so set them again. Suspended tabs come back by themselves.
 
 ### From source
 
@@ -107,7 +109,7 @@ Needs Node 24 (see `.nvmrc`).
 | `npm run dev`     | Rebuilds `dist` on every change. Reload the extension to see it.        |
 | `npm test`        | Runs the unit tests.                                                    |
 | `npm run check`   | Formatting, lint, types, tests and a build: run this before committing. |
-| `npm run package` | Runs the checks, then zips `dist` into `release/` for a web store.      |
+| `npm run package` | Checks, then zips `dist` into `release/`: unpacked and store zips.      |
 
 The code is split into three layers:
 
